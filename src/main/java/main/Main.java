@@ -1,3 +1,8 @@
+package main;
+
+import csv.CSVManager;
+import jira.RetrieveReleases;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +17,7 @@ public class Main {
     public static void main (String[] args) throws Exception {
         /* As first thing, retrieve all released version with releaseDate */
         try {
-            ArrayList<String[]> versions = RetrieveReleases.getReleases(PROJECT_NAME);
+            ArrayList<String[]> versions = (ArrayList<String[]>) RetrieveReleases.getReleases(PROJECT_NAME);
 
             // write versions to csv file
             CSVManager.csvWriteAll(RELEASES_PATH, versions);

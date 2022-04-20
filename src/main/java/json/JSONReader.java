@@ -1,3 +1,5 @@
+package json;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -6,6 +8,9 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 public class JSONReader {
+
+    private JSONReader(){}
+
     private static String readAll(Reader rd) throws IOException {
         StringBuilder sb = new StringBuilder();
         int cp;

@@ -1,13 +1,22 @@
+package jira;
+
+import json.JSONReader;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.List;
 
 public class RetrieveTicketsID {
 
-    public static ArrayList<String> getTicketsID(String projectName) throws IOException, JSONException {
-        int j, i = 0, total;
+    private RetrieveTicketsID() {}
+
+
+    public static List<String> getTicketsID(String projectName) throws IOException, JSONException {
+        int j;
+        int i = 0;
+        int total;
         //Get JSON API for closed bugs w/ AV in the project
         ArrayList<String> results = new ArrayList<>();
         do {
@@ -23,16 +32,6 @@ public class RetrieveTicketsID {
             for (; i < total && i < j; i++) {
                 //Iterate through each bug
                 String key = issues.getJSONObject(i % 1000).get("key").toString();
-                /*
-                JSONObject fields = (JSONObject) issues.getJSONObject(i%1000).get("fields");
-                String date = fields.get("resolutiondate").toString();
-                JSONArray versions_array = fields.getJSONArray("versions");
-                StringBuilder versions = new StringBuilder();
-                for (int k = 0; k < versions_array.length(); k++){
-                    versions.append(" ").append(versions_array.getJSONObject(k).getString("name"));
-                }
-                String created = fields.get("created").toString();
-                 */
                 results.add(key);
             }
         } while (i < total);

@@ -1,21 +1,28 @@
+package jira;
+
+import json.JSONReader;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class RetrieveReleases {
 
     private static final int MAX_RESULTS = 1000;
 
+    private RetrieveReleases(){}
+
+
     /**
      * @param projectName name of the project
      * @return ArrayList; each entry is an array of 2 Strings (version, release date)
      */
-    public static ArrayList<String[]> getReleases (String projectName) throws IOException, JSONException{
-        int i = 0, total;
+    public static List<String[]> getReleases (String projectName) throws IOException, JSONException{
+        int i = 0;
+        int total;
         ArrayList<String[]> results = new ArrayList<>();
         /*
           With a maximum of 1000 we should have all releases in one json file,
@@ -37,16 +44,16 @@ public class RetrieveReleases {
         JSONArray values = json.getJSONArray("values");
         for (; i < total; i++) {
             //Iterate through each version object
-            JSONObject version_obj = values.getJSONObject(i);
+            JSONObject versionObj = values.getJSONObject(i);
 
             // version name (e.g. 1.0.5)
-            String name = version_obj.getString("name");
-            boolean released = version_obj.getBoolean("released");
+            String name = versionObj.getString("name");
+            boolean released = versionObj.getBoolean("released");
 
             // store only the released versions !!!
             if (released) {
                 // date is in format yyyy-MM-dd
-                String releaseDate = version_obj.getString("releaseDate");
+                String releaseDate = versionObj.getString("releaseDate");
                 results.add(new String[]{name, releaseDate});
             }
         }
