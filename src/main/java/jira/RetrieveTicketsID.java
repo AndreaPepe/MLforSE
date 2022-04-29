@@ -1,6 +1,7 @@
 package jira;
 
 import json.JSONReader;
+import model.JiraTicket;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -13,12 +14,12 @@ public class RetrieveTicketsID {
     private RetrieveTicketsID() {}
 
 
-    public static List<String> getTicketsID(String projectName) throws IOException, JSONException {
+    public static List<JiraTicket> getTicketsID(String projectName) throws IOException, JSONException {
         int j;
         int i = 0;
         int total;
         //Get JSON API for closed bugs w/ AV in the project
-        ArrayList<String> results = new ArrayList<>();
+        ArrayList<JiraTicket> results = new ArrayList<>();
         do {
             //Only gets a max of 1000 at a time, so must do this multiple times if bugs >1000
             j = i + 1000;
@@ -31,11 +32,31 @@ public class RetrieveTicketsID {
             total = json.getInt("total");
             for (; i < total && i < j; i++) {
                 //Iterate through each bug
-                String key = issues.getJSONObject(i % 1000).get("key").toString();
-                results.add(key);
+                JiraTicket ticket = parseJsonTicket(issues.getJSONObject(i % 1000));
+                results.add(ticket);
             }
         } while (i < total);
 
         return results;
+    }
+
+    private static JiraTicket parseJsonTicket(JSONObject ticket){
+        String key = ticket.get("key").toString();
+        JSONObject fields = ticket.getJSONObject("fields");
+
+        // parsing the affected versions
+        JSONArray versions = fields.getJSONArray("versions");
+        ArrayList<String> parsedVersions = new ArrayList<>();
+        for (int i = 0; i < versions.length(); i++){
+            JSONObject version = versions.getJSONObject(i);
+            boolean released = version.getBoolean("released");
+            if (released) {
+                parsedVersions.add(version.getString("name"));
+            }
+        }
+        // parsing creation and fixing dates
+        String creation = fields.getString("created").substring(0,10);
+        String fix = fields.getString("resolutiondate").substring(0,10);
+        return new JiraTicket(key, creation, fix, parsedVersions);
     }
 }
