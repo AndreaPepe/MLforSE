@@ -13,7 +13,7 @@ public class GitAnalyzer {
         return git.log().call();
     }
 
-    public List<RevCommit> getCommitsContainingString(Iterable<RevCommit> commits, String target){
+    public List<RevCommit> getCommitsContainingString(Iterable<RevCommit> commits, String target) {
         ArrayList<RevCommit> results = new ArrayList<>();
         for (RevCommit commit : commits) {
             // comparison is done without lower case

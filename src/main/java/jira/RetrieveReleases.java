@@ -6,38 +6,39 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDate;
+import java.util.*;
 
 public class RetrieveReleases {
 
     private static final int MAX_RESULTS = 1000;
 
-    private RetrieveReleases(){}
+    private RetrieveReleases() {
+    }
 
 
     /**
      * @param projectName name of the project
      * @return ArrayList; each entry is an array of 2 Strings (version, release date)
      */
-    public static List<String[]> getReleases (String projectName) throws IOException, JSONException{
+    public static List<Map.Entry<LocalDate, String>> getReleases(String projectName) throws IOException, JSONException {
         int i = 0;
         int total;
-        ArrayList<String[]> results = new ArrayList<>();
+        List<Map.Entry<LocalDate, String>> results = new ArrayList<>();
         /*
           With a maximum of 1000 we should have all releases in one json file,
           so maxResult is hardcoded in url request
         */
 
         String url = "https://issues.apache.org/jira/rest/api/2/project/" + projectName
-                + "/version?maxResults=" + MAX_RESULTS + "&startAt="+ i;
+                + "/version?maxResults=" + MAX_RESULTS + "&startAt=" + i;
         JSONObject json = JSONReader.readJsonFromUrl(url);
         total = json.getInt("total");
         boolean isLast = json.getBoolean("isLast");
 
         // let's check that the previous assumption (number of releases <= 1000) it's verified
-        if (!isLast){
-            throw new JSONException("Json output for releases contained more than" + MAX_RESULTS +"entries");
+        if (!isLast) {
+            throw new JSONException("Json output for releases contained more than" + MAX_RESULTS + "entries");
         }
 
         // parse json response to get version name and release date if they have been released
@@ -54,7 +55,8 @@ public class RetrieveReleases {
             if (released) {
                 // date is in format yyyy-MM-dd
                 String releaseDate = versionObj.getString("releaseDate");
-                results.add(new String[]{name, releaseDate});
+                LocalDate date = LocalDate.parse(releaseDate);
+                results.add(new AbstractMap.SimpleEntry<>(date, name));
             }
         }
 

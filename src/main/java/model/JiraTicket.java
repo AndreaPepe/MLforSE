@@ -1,14 +1,15 @@
 package model;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class JiraTicket {
     private String key;
     private String creationDate;
     private String fixedDate;
-    private ArrayList<String> affectedVersions;
+    private List<String> affectedVersions;
 
-    public JiraTicket(String key, String creationDate, String fixedDate, ArrayList<String> affectedVersions) {
+    public JiraTicket(String key, String creationDate, String fixedDate, List<String> affectedVersions) {
         this.key = key;
         this.creationDate = creationDate;
         this.fixedDate = fixedDate;
@@ -39,11 +40,11 @@ public class JiraTicket {
         this.fixedDate = fixedDate;
     }
 
-    public ArrayList<String> getAffectedVersions() {
+    public List<String> getAffectedVersions() {
         return affectedVersions;
     }
 
-    public void setAffectedVersions(ArrayList<String> affectedVersions) {
+    public void setAffectedVersions(List<String> affectedVersions) {
         this.affectedVersions = affectedVersions;
     }
 

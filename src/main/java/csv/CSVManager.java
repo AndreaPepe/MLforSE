@@ -10,7 +10,8 @@ import java.util.List;
 
 public class CSVManager {
 
-    private CSVManager(){}
+    private CSVManager() {
+    }
 
     public static void csvWriteAll(String filename, List<String[]> lines) throws CSVException, IOException {
         /*
@@ -18,7 +19,7 @@ public class CSVManager {
             If the file already exists, delete it; create the file and write it.
             */
         File file = new File(filename);
-        if (file.exists() && !file.delete()){
+        if (file.exists() && !file.delete()) {
             throw new CSVException("Unable to delete file");
         }
         FileWriter writer = new FileWriter(file);
