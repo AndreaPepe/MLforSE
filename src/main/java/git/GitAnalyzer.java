@@ -5,6 +5,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class GitAnalyzer {
 
@@ -12,7 +13,7 @@ public class GitAnalyzer {
         return git.log().call();
     }
 
-    public ArrayList<RevCommit> getCommitsContainingString(Iterable<RevCommit> commits, String target){
+    public List<RevCommit> getCommitsContainingString(Iterable<RevCommit> commits, String target){
         ArrayList<RevCommit> results = new ArrayList<>();
         for (RevCommit commit : commits) {
             // comparison is done without lower case

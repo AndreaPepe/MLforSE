@@ -42,10 +42,13 @@ public class Main {
             /*
             * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
             * */
+        } catch (IOException e) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, "Exception", e);
+        }
 
             ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(PROJECT_NAME);
             for (JiraTicket ticket : tickets)
-                logger.log(Level.INFO, ticket.toString());
+                logger.log(Level.INFO,"{0}", ticket.toString());
 
 
             /*
@@ -64,7 +67,7 @@ public class Main {
                     GitAnalyzer analyzer = new GitAnalyzer();
                     Iterable<RevCommit> log = analyzer.getGitLog(GitSingleton.getInstance().getGit());
                     // here we pass the ticket as a keyword to be searched in commit message
-                    ArrayList<RevCommit> results = analyzer.getCommitsContainingString(log, ticket.getKey());
+                    ArrayList<RevCommit> results = new ArrayList<>(analyzer.getCommitsContainingString(log, ticket.getKey()));
 
                     for (RevCommit commit: results){
                         String id = commit.getId().toString().split(" ")[1];
@@ -79,15 +82,12 @@ public class Main {
                         commits.add(comm);
                     }
                 } catch (GitAPIException e) {
-                    logger.log(Level.SEVERE, "Error for ticket: " + ticket, e);
+                    logger.log(Level.SEVERE, String.format("Error for ticket: {0}", ticket.getKey()), e);
                 }
             }
 
             /**for (GitCommit commit : commits){
                 logger.log(Level.INFO, commit.toString());
             }*/
-        } catch (IOException e) {
-            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, "Exception", e);
-        }
     }
 }

@@ -1,5 +1,6 @@
 package logging;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.logging.Formatter;
@@ -13,20 +14,11 @@ class CustomRecordFormatter extends Formatter {
         if (null != r.getThrown()) {
             sb.append("Throwable occurred: "); //$NON-NLS-1$
             Throwable t = r.getThrown();
-            PrintWriter pw = null;
-            try {
-                StringWriter sw = new StringWriter();
-                pw = new PrintWriter(sw);
+            try (StringWriter sw = new StringWriter(); PrintWriter pw = new PrintWriter(sw)){
                 t.printStackTrace(pw);
-                sb.append(sw.toString());
-            } finally {
-                if (pw != null) {
-                    try {
-                        pw.close();
-                    } catch (Exception e) {
-                        // ignore
-                    }
-                }
+                sb.append(sw);
+            } catch (IOException e) {
+                //ignore
             }
         }
         return sb.toString();

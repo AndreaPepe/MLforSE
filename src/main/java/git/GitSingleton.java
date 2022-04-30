@@ -15,7 +15,7 @@ public class GitSingleton {
 
     private static GitSingleton instance = null;
     private Git git = null;
-    private final String repo_path;
+    private final String repoPath;
 
     public static synchronized GitSingleton getInstance(){
         if (instance == null)
@@ -24,7 +24,7 @@ public class GitSingleton {
     }
 
     protected GitSingleton(){
-        this.repo_path = parseConfiguration();
+        this.repoPath = parseConfiguration();
     }
 
     private String parseConfiguration(){
@@ -52,7 +52,7 @@ public class GitSingleton {
         if (this.git == null){
             try {
                 FileRepositoryBuilder repoBuilder = new FileRepositoryBuilder();
-                Repository repo = repoBuilder.setGitDir(new File(this.repo_path + "\\.git")).setMustExist(true).build();
+                Repository repo = repoBuilder.setGitDir(new File(this.repoPath + "\\.git")).setMustExist(true).build();
                 this.git = new Git(repo);
             } catch (IOException e) {
                 LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Exception JGit in building repository", e);
