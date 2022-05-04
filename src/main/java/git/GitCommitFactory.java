@@ -28,6 +28,6 @@ public class GitCommitFactory {
 
         String author = commit.getCommitterIdent().getName();
         String date = new SimpleDateFormat("yyyy-MM-dd").format(new Date(commit.getCommitTime() * 1000L));
-        return new GitCommit(id, shortId, date, author, msg, jiraTicketKey);
+        return new GitCommit(commit, id, shortId, date, author, msg, jiraTicketKey);
     }
 }

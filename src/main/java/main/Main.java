@@ -1,28 +1,25 @@
 package main;
 
 import controller.BugManager;
+import controller.GitManager;
 import controller.VersionManager;
 import csv.CSVManager;
 import git.GitAnalyzer;
 import git.GitCommitFactory;
 import git.GitSingleton;
-import jira.RetrieveReleases;
 import jira.RetrieveTicketsID;
 import logging.LoggerSingleton;
 import model.Bug;
+import model.CSVEntry;
 import model.GitCommit;
 import model.JiraTicket;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.revwalk.RevCommit;
 
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static java.lang.Math.round;
 
 public class Main {
     private static final String PROJECT_NAME = "SYNCOPE";
@@ -45,9 +42,9 @@ public class Main {
          * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
          * */
         ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(PROJECT_NAME);
-        /**for (JiraTicket ticket : tickets)
-            logger.info(ticket.toString());*/
-
+        /*for (JiraTicket ticket : tickets)
+            logger.info(ticket.toString());
+        */
 
         /*
          * Now, for each ticket, let see if it is contained in the first half of the releases
@@ -61,23 +58,19 @@ public class Main {
         List<GitCommit> commits = new ArrayList<>();
 
         for (JiraTicket ticket : tickets) {
-            try {
-                GitAnalyzer analyzer = new GitAnalyzer();
-                // get the entire log of commits
-                Iterable<RevCommit> gitLog = analyzer.getGitLog(GitSingleton.getInstance().getGit());
-                // here we pass the ticket as a keyword to be searched in commit message
-                ArrayList<RevCommit> results = new ArrayList<>(analyzer.getCommitsContainingString(gitLog, ticket.getKey()));
+            GitAnalyzer analyzer = new GitAnalyzer();
+            // get the entire log of commits
+            Iterable<RevCommit> gitLog = analyzer.getGitLog(GitSingleton.getInstance().getGit());
+            // here we pass the ticket as a keyword to be searched in commit message
+            ArrayList<RevCommit> results = new ArrayList<>(analyzer.getCommitsContainingString(gitLog, ticket.getKey()));
 
-                GitCommitFactory factory = GitCommitFactory.getInstance();
-                for (RevCommit commit : results) {
-                    commits.add(factory.parseCommit(commit, ticket.getKey()));
-                }
-            } catch (GitAPIException e) {
-                logger.log(Level.SEVERE, String.format("Error for ticket: %s", ticket.getKey()), e);
+            GitCommitFactory factory = GitCommitFactory.getInstance();
+            for (RevCommit commit : results) {
+                commits.add(factory.parseCommit(commit, ticket.getKey()));
             }
         }
 
-        /**for (GitCommit commit : commits){
+        /*for (GitCommit commit : commits){
          logger.log(Level.INFO, commit.toString());
          }*/
 
@@ -104,5 +97,41 @@ public class Main {
         bugs = BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
+
+
+        /*-----------------------------------------------GIT FILES------------------------------------------------------*/
+
+        /*
+        git diff --stat -M --name-status <commitID>
+        */
+
+        Iterable<RevCommit> gitLog = new GitAnalyzer().getGitLog(GitSingleton.getInstance().getGit());
+        ArrayList<RevCommit> allLog = new ArrayList<>();
+        for (RevCommit c: gitLog)
+            allLog.add(c);
+        GitManager gitManager = new GitManager(versionManager);
+        List<CSVEntry> entries = new ArrayList<>();
+        for (Bug bug: bugs){
+            entries.addAll(gitManager.commitToCSVEntries(bug.getFixCommit(), allLog));
+            if(bug.getOtherCommits() != null) {
+                for (GitCommit commit : bug.getOtherCommits()) {
+                    entries.addAll(gitManager.commitToCSVEntries(commit, allLog));
+                }
+            }
+        }
+
+        List<String[]> arrayOfCSVEntry = new ArrayList<>();
+        // add headings
+        arrayOfCSVEntry.add(new String[]{"Version", "Filename", "Buggy"});
+        for (CSVEntry entry : entries){
+            arrayOfCSVEntry.add(entry.toStringArray());
+        }
+
+        CSVManager.csvWriteAll("Syncope_dataset.csv", arrayOfCSVEntry);
     }
+
+
+
+
+
 }

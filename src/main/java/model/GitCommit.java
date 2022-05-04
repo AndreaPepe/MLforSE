@@ -1,6 +1,9 @@
 package model;
 
+import org.eclipse.jgit.revwalk.RevCommit;
+
 public class GitCommit {
+    private RevCommit revCommit;
     private String id;
     private String shortId;
     private String date;
@@ -9,7 +12,8 @@ public class GitCommit {
     private String jiraTicket;
 
 
-    public GitCommit(String id, String shortId, String date, String author, String msg, String jiraTicket) {
+    public GitCommit(RevCommit revCommit, String id, String shortId, String date, String author, String msg, String jiraTicket) {
+        this.revCommit = revCommit;
         this.id = id;
         this.shortId = shortId;
         this.date = date;
@@ -18,11 +22,19 @@ public class GitCommit {
         this.jiraTicket = jiraTicket;
     }
 
-    public GitCommit(String id, String date, String author, String msg) {
+    public GitCommit(RevCommit revCommit, String id, String date, String author, String msg) {
+        this.revCommit = revCommit;
         this.id = id;
         this.date = date;
         this.author = author;
         this.msg = msg;
+    }
+    public RevCommit getRevCommit() {
+        return revCommit;
+    }
+
+    public void setRevCommit(RevCommit revCommit) {
+        this.revCommit = revCommit;
     }
 
     public String getId() {
@@ -84,4 +96,6 @@ public class GitCommit {
                 ", jiraTicket='" + jiraTicket + '\'' +
                 '}';
     }
+
+
 }

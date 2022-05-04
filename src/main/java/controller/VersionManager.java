@@ -18,14 +18,14 @@ public class VersionManager {
 
     private Map<LocalDate, String> versions;
     private Map<LocalDate, String> halfVersions;
-    private String projectName;
-    private static String RELEASES_PATH = "_releases.csv";
-    private Logger logger;
+    private final String projectName;
+    private static final String RELEASES_PATH = "_releases.csv";
+    private final Logger logger;
 
-    public VersionManager(String projectName, Logger logger){
+    public VersionManager(String projectName, Logger logger) {
         this.logger = logger;
         this.projectName = projectName;
-        RELEASES_PATH = projectName.toLowerCase(Locale.ROOT) + RELEASES_PATH;
+        String pathname = projectName.toLowerCase(Locale.ROOT) + RELEASES_PATH;
         try {
             List<Map.Entry<LocalDate, String>> versions = new ArrayList<>(RetrieveReleases.getReleases(projectName));
             versions.sort(new Comparator<Map.Entry<LocalDate, String>>() {
@@ -46,7 +46,7 @@ public class VersionManager {
             for (Map.Entry<LocalDate, String> entry : sortedVersions.entrySet()) {
                 lines.add(new String[]{entry.getValue(), entry.getKey().toString()});
             }
-            CSVManager.csvWriteAll(RELEASES_PATH, lines);
+            CSVManager.csvWriteAll(pathname, lines);
 
             /* maintain only the first half of releases */
             Map<LocalDate, String> halfVersions = new LinkedHashMap<>();
@@ -70,11 +70,11 @@ public class VersionManager {
         }
     }
 
-    public List<Bug> calculateVersionsForBugs(List<Bug> bugs){
+    public List<Bug> calculateVersionsForBugs(List<Bug> bugs) {
         long proportion = 0;
         long maxDistance = 0;
         int count = 0;
-        for (Bug bug: bugs){
+        for (Bug bug : bugs) {
             // find the opening version
             String openingDate = bug.getOpeningDate();
             String openingVersion = findVersionByDate(openingDate);
@@ -85,11 +85,18 @@ public class VersionManager {
             String fixVersion = findVersionByDate(fixedDate);
             bug.setFixVersion(fixVersion);
 
-            long daysBetween = LocalDate.parse(fixedDate).minusDays(LocalDate.parse(openingDate).toEpochDay()).toEpochDay();
-            if(daysBetween > maxDistance)
-                maxDistance = daysBetween;
-            proportion += daysBetween;
-            count ++;
+            /* For now, let's take only releases with affected versions already indicated
+             */
+            List<String> affVersions = bug.getAffectedVersions();
+            if (affVersions == null) {
+                bugs.remove(bug);
+            }
+
+            /**long daysBetween = LocalDate.parse(fixedDate).minusDays(LocalDate.parse(openingDate).toEpochDay()).toEpochDay();
+             if(daysBetween > maxDistance)
+             maxDistance = daysBetween;
+             proportion += daysBetween;
+             count ++;*/
             /*
             List<String> affected = bug.getAffectedVersions();
            if (affected != null && !affected.isEmpty()){
@@ -100,9 +107,9 @@ public class VersionManager {
                }
            }*/
         }
-        double proportionFactor = (double)proportion/count;
+        /*double proportionFactor = (double)proportion/count;
         logger.info("\nProportion factor = " + proportionFactor);
-        logger.info("\nMax Distance (in days)" + maxDistance);
+        logger.info("\nMax Distance (in days)" + maxDistance);*/
         return bugs;
     }
 
@@ -110,21 +117,42 @@ public class VersionManager {
     /**
      * Iterates the linked (and sorted) list of versions until it finds one that has
      * a release date that is equal or after the input date. In that case, that is the version.
+     *
      * @param date String in 'yyyy-MM-dd' format of the date
      * @return the name of the OV
      */
-    private String findVersionByDate(String date){
+    public String findVersionByDate(String date) {
         LocalDate openDate = LocalDate.parse(date);
         String result = null;
-        for (Map.Entry<LocalDate, String> entry: this.versions.entrySet()){
-            if (entry.getKey().isEqual(openDate) || entry.getKey().isAfter(openDate)){
+        for (Map.Entry<LocalDate, String> entry : this.versions.entrySet()) {
+            if (entry.getKey().isEqual(openDate) || entry.getKey().isAfter(openDate)) {
                 result = entry.getValue();
                 break;
             }
         }
-        if (result == null)
-            logger.log(Level.SEVERE, "No VERSION FOUND!");
+        if (result == null) {
+            // date is after the date of the latest released version, so it's part of the current release
+            logger.log(Level.SEVERE, "No VERSION FOUND! Date: " + date);
+        }
         return result;
+    }
+
+    public boolean isAfterVersion(String versionName, String targetVersion){
+        LocalDate versionDate = null;
+        LocalDate targetDate = null;
+        for (Map.Entry<LocalDate, String> entry : this.versions.entrySet()) {
+            if (entry.getValue().equals(versionName)) {
+                versionDate = entry.getKey();
+            }
+            if (entry.getValue().equals(targetVersion)){
+                targetDate = entry.getKey();
+            }
+            if (versionDate != null && targetDate!= null)
+                break;
+        }
+        assert versionDate != null;
+        assert targetDate != null;
+        return versionDate.isAfter(targetDate);
     }
 
 }
