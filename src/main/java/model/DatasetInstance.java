@@ -1,11 +1,11 @@
 package model;
 
-public class CSVEntry {
+public class DatasetInstance {
     private String version;
     private String filename;
     private boolean buggy;
 
-    public CSVEntry(String version, String filename, boolean buggy) {
+    public DatasetInstance(String version, String filename, boolean buggy) {
         this.version = version;
         this.filename = filename;
         this.buggy = buggy;

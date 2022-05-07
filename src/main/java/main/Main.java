@@ -10,57 +10,28 @@ import git.GitSingleton;
 import jira.RetrieveTicketsID;
 import logging.LoggerSingleton;
 import model.Bug;
-import model.CSVEntry;
+import model.DatasetInstance;
 import model.GitCommit;
 import model.JiraTicket;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import java.util.logging.Level;
+import java.util.Map;
 import java.util.logging.Logger;
 
 public class Main {
     private static final String PROJECT_NAME = "SYNCOPE";
 
-
-    public static void main(String[] args) throws Exception {
-        Logger logger = LoggerSingleton.getInstance().getLogger();
-
-
-        /*--------------------------------------------------------RELEASES-------------------------------------------------------*/
-
-        /*
-        The constructor of the VersionManager retrieves all the released version for the specified project,
-        store them sorted chronologically, both all versions and the first half of them.
-         */
-        VersionManager versionManager = new VersionManager(PROJECT_NAME, logger);
-
-        /*------------------------------------------------------JIRA TICKETS-----------------------------------------------------*/
-        /*
-         * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
-         * */
-        ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(PROJECT_NAME);
-        /*for (JiraTicket ticket : tickets)
-            logger.info(ticket.toString());
-        */
-
-        /*
-         * Now, for each ticket, let see if it is contained in the first half of the releases
-         * */
-
-
-        /*
-         * Now, for each ticket, let see in which Git commit is present
-         * */
-
+    private static List<GitCommit> retrieveCommitsWithJiraTickets(List<JiraTicket> tickets, Date maxDate) throws GitAPIException {
         List<GitCommit> commits = new ArrayList<>();
 
         for (JiraTicket ticket : tickets) {
             GitAnalyzer analyzer = new GitAnalyzer();
             // get the entire log of commits
-            Iterable<RevCommit> gitLog = analyzer.getGitLog(GitSingleton.getInstance().getGit());
+            Iterable<RevCommit> gitLog = analyzer.getGitLog(GitSingleton.getInstance().getGit(), maxDate);
             // here we pass the ticket as a keyword to be searched in commit message
             ArrayList<RevCommit> results = new ArrayList<>(analyzer.getCommitsContainingString(gitLog, ticket.getKey()));
 
@@ -69,10 +40,49 @@ public class Main {
                 commits.add(factory.parseCommit(commit, ticket.getKey()));
             }
         }
-
         /*for (GitCommit commit : commits){
          logger.log(Level.INFO, commit.toString());
          }*/
+        commits.sort((a,b) -> {
+            int aCommitTime = a.getRevCommit().getCommitTime();
+            int bCommitTime = b.getRevCommit().getCommitTime();
+            if (aCommitTime > bCommitTime)
+                return 1;
+            else if (aCommitTime == bCommitTime)
+                return 0;
+            return -1;
+        });
+        return commits;
+    }
+
+    public static void main(String[] args) throws Exception {
+        Logger logger = LoggerSingleton.getInstance().getLogger();
+
+
+        /*--------------------------------------------------------JIRA (RELEASES + TICKETS)-------------------------------------------------------*/
+
+        /*
+        The constructor of the VersionManager retrieves all the released version for the specified project,
+        store them sorted chronologically, both all versions and the first half of them.
+         */
+        VersionManager versionManager = new VersionManager(PROJECT_NAME, logger);
+        versionManager.setReleases();
+        Date maxDate = versionManager.getLatestReleaseDate();
+        /*
+         * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
+         * */
+        ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(PROJECT_NAME);
+        /*for (JiraTicket ticket : tickets)
+            logger.info(ticket.toString());
+        */
+
+        /*---------------------------------------------------------------------GIT-------------------------------------------------------------*/
+        /*
+         * Now, for each ticket, let see in which Git commit is present
+         * */
+
+        List<GitCommit> fixCommits = retrieveCommitsWithJiraTickets(tickets, maxDate);
+        List<RevCommit> allCommits = new GitAnalyzer().getDatetimeSortedGitLog(GitSingleton.getInstance().getGit(), maxDate);
 
 
         /*---------------------------------------------------------------------BUGS----------------------------------------------------------*/
@@ -84,7 +94,7 @@ public class Main {
         }
 
         // let's process bugs with commits to define fix commit and other commits for the specific bug
-        bugs = BugManager.setFixCommitAndOtherCommits(bugs, commits);
+        BugManager.setFixCommitAndOtherCommits(bugs, fixCommits);
 
         /* now, remove bugs with no bounded commit and add metadata on which is its fixing commit
          * That can be chosen in 2 ways:
@@ -94,10 +104,11 @@ public class Main {
          * Bugs with no such commits are removed from the list.
          */
 
-        bugs = BugManager.patchFixCommit(bugs);
+        BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
 
+        Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
 
         /*-----------------------------------------------GIT FILES------------------------------------------------------*/
 
@@ -105,25 +116,19 @@ public class Main {
         git diff --stat -M --name-status <commitID>
         */
 
-        Iterable<RevCommit> gitLog = new GitAnalyzer().getGitLog(GitSingleton.getInstance().getGit());
-        ArrayList<RevCommit> allLog = new ArrayList<>();
-        for (RevCommit c: gitLog)
-            allLog.add(c);
-        GitManager gitManager = new GitManager(versionManager);
-        List<CSVEntry> entries = new ArrayList<>();
-        for (Bug bug: bugs){
-            entries.addAll(gitManager.commitToCSVEntries(bug.getFixCommit(), allLog));
-            if(bug.getOtherCommits() != null) {
-                for (GitCommit commit : bug.getOtherCommits()) {
-                    entries.addAll(gitManager.commitToCSVEntries(commit, allLog));
-                }
-            }
-        }
+        GitManager gitManager = new GitManager(versionManager, bugs);
+
+
+
+
+
+
+        List<DatasetInstance> dataset = gitManager.computeDataset(commitPerRelease, fixCommits);
 
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
         arrayOfCSVEntry.add(new String[]{"Version", "Filename", "Buggy"});
-        for (CSVEntry entry : entries){
+        for (DatasetInstance entry : dataset){
             arrayOfCSVEntry.add(entry.toStringArray());
         }
 

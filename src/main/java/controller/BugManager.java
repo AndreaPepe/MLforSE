@@ -13,8 +13,8 @@ public class BugManager {
      * of Jira corresponds to the date of the commit, then the commit is classified as the fix commit of the bug.
      * Otherwise, the commit is classified as 'otherCommit'.
      *
-     * @param bugs
-     * @param commits
+     * @param bugs list of bugs
+     * @param commits list of commits
      * @return The modified list of bugs
      */
     public static List<Bug> setFixCommitAndOtherCommits(List<Bug> bugs, List<GitCommit> commits) {
@@ -39,16 +39,14 @@ public class BugManager {
     /**
      * Remove bugs that have no fix commit and no commits that make reference to them
      *
-     * @param bugs
-     * @return The modified list of bugs
+     * @param bugs list of bugs
      */
-    private static List<Bug> removeBugsWithNoCommits(List<Bug> bugs) {
+    private static void removeBugsWithNoCommits(List<Bug> bugs) {
         bugs.removeIf(bug -> bug.getFixCommit() == null && (bug.getOtherCommits() == null || bug.getOtherCommits().isEmpty()));
-        return bugs;
     }
 
-    public static List<Bug> patchFixCommit(List<Bug> bugs) {
-        bugs = removeBugsWithNoCommits(bugs);
+    public static void patchFixCommit(List<Bug> bugs) {
+        removeBugsWithNoCommits(bugs);
         for (Bug bug : bugs) {
             if (bug.getFixCommit() == null) {
                 // get the other commit with last date
@@ -66,6 +64,5 @@ public class BugManager {
                     bug.setFixCommit(candidateFix);
             }
         }
-        return bugs;
     }
 }

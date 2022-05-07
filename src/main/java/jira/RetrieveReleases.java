@@ -21,10 +21,10 @@ public class RetrieveReleases {
      * @param projectName name of the project
      * @return ArrayList; each entry is an array of 2 Strings (version, release date)
      */
-    public static List<Map.Entry<LocalDate, String>> getReleases(String projectName) throws IOException, JSONException {
+    public static List<Map.Entry<String, LocalDate>> getReleases(String projectName) throws IOException, JSONException {
         int i = 0;
         int total;
-        List<Map.Entry<LocalDate, String>> results = new ArrayList<>();
+        List<Map.Entry<String, LocalDate>> results = new ArrayList<>();
         /*
           With a maximum of 1000 we should have all releases in one json file,
           so maxResult is hardcoded in url request
@@ -56,7 +56,7 @@ public class RetrieveReleases {
                 // date is in format yyyy-MM-dd
                 String releaseDate = versionObj.getString("releaseDate");
                 LocalDate date = LocalDate.parse(releaseDate);
-                results.add(new AbstractMap.SimpleEntry<>(date, name));
+                results.add(new AbstractMap.SimpleEntry<>(name, date));
             }
         }
 
