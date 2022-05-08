@@ -218,6 +218,8 @@ public class VersionManager {
         int indexOpening = findIndexOfVersion(openVer);
         int indexInjected = (int) Math.floor(indexFix - this.proportion * (indexFix - indexOpening));
         // predicted IV = FV - (FV - OV) * p
+        if(indexInjected < 0)
+            indexInjected = 0;
         return this.versionsArray[indexInjected];
     }
 
@@ -278,7 +280,6 @@ public class VersionManager {
         if (result == null) {
             // date is after the date of the latest released version, so it's part of the current release
             logger.log(Level.SEVERE, "No VERSION FOUND! Date: " + date);
-            throw new CommitWithNoReleaseException("No version found");
         }
         return result;
     }
@@ -301,5 +302,18 @@ public class VersionManager {
         return versionDate.isAfter(targetDate);
     }
 
+
+    public String findNextVersion(String version){
+        for(int i = 0; i<versionsArray.length - 1; i++){
+            if (versionsArray[i].equals(version))
+                return versionsArray[i+1];
+        }
+        // the latest version
+        return null;
+    }
+
+    public int getReleasesSize(){
+        return this.versions.size();
+    }
 
 }

@@ -16,15 +16,17 @@ import model.GitCommit;
 import model.JiraTicket;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class Main {
-    private static final String PROJECT_NAME = "SYNCOPE";
+    private static String PROJECT_NAME;
 
     private static List<GitCommit> retrieveCommitsWithJiraTickets(List<JiraTicket> tickets, Date maxDate) throws GitAPIException {
         List<GitCommit> commits = new ArrayList<>();
@@ -44,7 +46,7 @@ public class Main {
         /*for (GitCommit commit : commits){
          logger.log(Level.INFO, commit.toString());
          }*/
-        commits.sort((a,b) -> {
+        commits.sort((a, b) -> {
             int aCommitTime = a.getRevCommit().getCommitTime();
             int bCommitTime = b.getRevCommit().getCommitTime();
             if (aCommitTime > bCommitTime)
@@ -57,6 +59,16 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
+        InputStream resource = Main.class.getClassLoader().getResourceAsStream("config.json");
+        if (resource != null) {
+            BufferedReader config = new BufferedReader(new InputStreamReader(resource));
+            JSONObject obj = (JSONObject) new JSONParser().parse(config);
+            String result = (String) obj.get("repo");
+            String[] strings = result.split("\\\\");
+            PROJECT_NAME = strings[strings.length - 1].toUpperCase(Locale.ROOT);
+        } else {
+            throw new IllegalArgumentException("Project name not found");
+        }
         Logger logger = LoggerSingleton.getInstance().getLogger();
 
 
@@ -66,13 +78,16 @@ public class Main {
         The constructor of the VersionManager retrieves all the released version for the specified project,
         store them sorted chronologically, both all versions and the first half of them.
          */
+        logger.info("Retrieving project's releases from Jira ...");
         VersionManager versionManager = new VersionManager(PROJECT_NAME, logger);
         versionManager.setReleases();
         Date maxDate = versionManager.getLatestReleaseDate();
+        logger.info("Retrieved releases: " + versionManager.getReleasesSize() + " Latest release's date: " + maxDate);
         /*
          * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
          * */
         ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(PROJECT_NAME);
+        logger.info("Jira tickets: " + tickets.size());
         /*for (JiraTicket ticket : tickets)
             logger.info(ticket.toString());
         */
@@ -82,9 +97,10 @@ public class Main {
          * Now, for each ticket, let see in which Git commit is present
          * */
 
+        logger.info("\nRetrieving commits from Git ...");
         List<GitCommit> fixCommits = retrieveCommitsWithJiraTickets(tickets, maxDate);
         List<RevCommit> allCommits = new GitAnalyzer().getDatetimeSortedGitLog(GitSingleton.getInstance().getGit(), maxDate);
-
+        logger.info("Total commits: " + allCommits.size() + " Fix commits: " + fixCommits.size());
 
         /*---------------------------------------------------------------------BUGS----------------------------------------------------------*/
 
@@ -108,10 +124,10 @@ public class Main {
         BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
-        logger.info("Versions for bug calculated");
+        logger.info("Identify FV, OV, AVs and IV for bugs. DONE");
 
         Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
-        logger.info("Commit split ovr releases. DONE");
+        logger.info("Split commits by releases. DONE");
 
         /*-----------------------------------------------GIT FILES------------------------------------------------------*/
 
@@ -128,15 +144,13 @@ public class Main {
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
         arrayOfCSVEntry.add(new String[]{"Version", "Filename", "Buggy"});
-        for (DatasetInstance entry : dataset){
+        logger.info("Dataset size: " + dataset.size() + " instances");
+        for (DatasetInstance entry : dataset) {
             arrayOfCSVEntry.add(entry.toStringArray());
         }
 
-        CSVManager.csvWriteAll("Syncope_dataset.csv", arrayOfCSVEntry);
+        CSVManager.csvWriteAll(PROJECT_NAME.toLowerCase(Locale.ROOT) + "_dataset.csv", arrayOfCSVEntry);
     }
-
-
-
 
 
 }
