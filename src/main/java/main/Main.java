@@ -1,6 +1,7 @@
 package main;
 
 import controller.BugManager;
+import controller.DatasetCreator;
 import controller.GitManager;
 import controller.VersionManager;
 import csv.CSVManager;
@@ -107,8 +108,10 @@ public class Main {
         BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
+        logger.info("Versions for bug calculated");
 
         Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
+        logger.info("Commit split ovr releases. DONE");
 
         /*-----------------------------------------------GIT FILES------------------------------------------------------*/
 
@@ -116,14 +119,11 @@ public class Main {
         git diff --stat -M --name-status <commitID>
         */
 
-        GitManager gitManager = new GitManager(versionManager, bugs);
+        GitManager gitManager = new GitManager(GitSingleton.getInstance().getGit());
+        DatasetCreator datasetCreator = new DatasetCreator(versionManager, gitManager, bugs, logger);
 
-
-
-
-
-
-        List<DatasetInstance> dataset = gitManager.computeDataset(commitPerRelease, fixCommits);
+        logger.info("Dataset creation begins ...");
+        List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease, fixCommits);
 
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings

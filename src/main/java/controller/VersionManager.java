@@ -26,6 +26,16 @@ public class VersionManager {
     private static final String RELEASES_PATH = "_releases.csv";
     private final Logger logger;
 
+    private String[] versionsArray;
+
+    /*
+    p = (FV - IV) / (FV - OV)
+    predicted IV = FV - (FV - OV) * p
+     */
+    private float proportion;
+    private int numberOfBugsUsedForProportion;
+    private float aggregatedProportion;
+
     public Date getLatestReleaseDate() {
         return latestReleaseDate;
     }
@@ -35,6 +45,9 @@ public class VersionManager {
     public VersionManager(String projectName, Logger logger) {
         this.logger = logger;
         this.projectName = projectName;
+        this.proportion = 0;
+        this.numberOfBugsUsedForProportion = 0;
+        this.aggregatedProportion = 0;
     }
 
     public void setReleases() {
@@ -84,7 +97,12 @@ public class VersionManager {
             this.latestReleaseDate = Date.from(latestDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
             /*----LOG----*/
             //logger.info(halfVersions.toString());
-
+            this.versionsArray = new String[this.versions.size()];
+            int i = 0;
+            for(Map.Entry<String,LocalDate> entry : this.versions.entrySet()) {
+                this.versionsArray[i] = entry.getKey();
+                i++;
+            }
         } catch (IOException | CSVException e) {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, "Exception", e);
         }
@@ -118,9 +136,7 @@ public class VersionManager {
 
 
     public List<Bug> calculateVersionsForBugs(List<Bug> bugs) throws CommitWithNoReleaseException {
-        long proportion = 0;
-        long maxDistance = 0;
-        int count = 0;
+        int numberOfProportion = 0;
         for (Bug bug : bugs) {
             // find the opening version
             String openingDate = bug.getOpeningDate();
@@ -135,29 +151,111 @@ public class VersionManager {
             /* For now, let's take only releases with affected versions already indicated
              */
             List<String> affVersions = bug.getAffectedVersions();
-            if (affVersions == null) {
-                bugs.remove(bug);
+            boolean valid = areValidAffectedVersions(bug);
+            if (valid) {
+                // affected versions are ok; the oldest one is the injected Version
+                String injectedVersion = findInjectedVersion(affVersions);
+                bug.setInjectedVersion(injectedVersion);
+                updateProportion(bug);
+            } else {
+                numberOfProportion++;
+                /*
+                Incremental proportion is used to identify the injected version
+                and consequently define the affected versions
+                 */
+                String injectedVersion = findInjectedVersionUsingProportion(bug);
+                List<String> affectedVersions = computeAffectedVersions(injectedVersion, fixVersion);
+                bug.setInjectedVersion(injectedVersion);
+                bug.setAffectedVersions(affectedVersions);
             }
 
-            /**long daysBetween = LocalDate.parse(fixedDate).minusDays(LocalDate.parse(openingDate).toEpochDay()).toEpochDay();
-             if(daysBetween > maxDistance)
-             maxDistance = daysBetween;
-             proportion += daysBetween;
-             count ++;*/
-            /*
-            List<String> affected = bug.getAffectedVersions();
-           if (affected != null && !affected.isEmpty()){
-               Map<LocalDate, String> versions = new LinkedHashMap<>();
-               for (Map.Entry<LocalDate, String> entry : this.versions.entrySet()){
-                   if (affected.contains(entry.getValue()))
-                       versions.put(entry.getKey(), entry.getValue());
-               }
-           }*/
         }
-        /*double proportionFactor = (double)proportion/count;
-        logger.info("\nProportion factor = " + proportionFactor);
-        logger.info("\nMax Distance (in days)" + maxDistance);*/
+        logger.info("Number of bug in which proportion has been used: " + numberOfProportion);
+        logger.info("Proportion p: " + this.proportion);
         return bugs;
+    }
+
+    private void updateProportion(Bug bug) {
+        int indexInjected = findIndexOfVersion(bug.getInjectedVersion());
+        int indexFixed = findIndexOfVersion(bug.getFixVersion());
+        int indexOpening = findIndexOfVersion(bug.getOpeningVersion());
+        // calculate proportion only if the FV and the OV are different (in order to avoid infinite)
+        if(indexFixed != indexOpening) {
+            float myProportion = (float) (indexFixed - indexInjected) / (indexFixed - indexOpening);
+            this.aggregatedProportion += myProportion;
+            this.numberOfBugsUsedForProportion++;
+            this.proportion = aggregatedProportion / numberOfBugsUsedForProportion;
+        }
+    }
+
+    private List<String> computeAffectedVersions(String injectedVersion, String fixVersion) {
+        List<String> aff = new ArrayList<>();
+        boolean addToList = false;
+        for (String s : this.versionsArray) {
+            if (s.equals(injectedVersion))
+                addToList = true;
+            if (s.equals(fixVersion)) {
+                return aff;
+            }
+            if (addToList)
+                aff.add(s);
+        }
+        return aff;
+    }
+
+    private int findIndexOfVersion(String version){
+        for (int i = 0; i<this.versionsArray.length; i++){
+            if (this.versionsArray[i].equals(version)){
+                return i;
+            }
+        }
+        return -1;
+    }
+    private String findInjectedVersionUsingProportion(Bug bug) {
+        String fixVer = bug.getFixVersion();
+        String openVer = bug.getOpeningVersion();
+        int indexFix = findIndexOfVersion(fixVer);
+        int indexOpening = findIndexOfVersion(openVer);
+        int indexInjected = (int) Math.floor(indexFix - this.proportion * (indexFix - indexOpening));
+        // predicted IV = FV - (FV - OV) * p
+        return this.versionsArray[indexInjected];
+    }
+
+    private boolean areValidAffectedVersions(Bug bug) {
+        List<String> affVersions = bug.getAffectedVersions();
+        if (affVersions == null || affVersions.isEmpty())
+            return false;
+        // if the fixed version is classified as affected
+        if (affVersions.contains(bug.getFixVersion())) {
+            bug.setAffectedVersions(new ArrayList<>());
+            return false;
+        }
+        // remove releases not considered
+        affVersions.removeIf(s -> !this.versions.containsKey(s));
+        if(affVersions.isEmpty()){
+            return false;
+        }
+        String injectedVersion = findInjectedVersion(affVersions);
+
+        // if the injected version is after the opening version
+        LocalDate injectedDate = this.versions.get(injectedVersion);
+        LocalDate openingDate = this.versions.get(bug.getOpeningVersion());
+        if (injectedDate.isAfter(openingDate)) {
+            bug.setAffectedVersions(new ArrayList<>());
+            return false;
+        }
+        bug.setAffectedVersions(affVersions);
+        return true;
+    }
+
+    private String findInjectedVersion(List<String> affVersions) {
+        for (Map.Entry<String, LocalDate> release : this.versions.entrySet()) {
+            // since releases are ordered by date, the first one that is in the affected versions list is the injected version
+            if (affVersions.contains(release.getKey())) {
+                return release.getKey();
+            }
+        }
+        return null;
     }
 
 
