@@ -26,10 +26,10 @@ import java.util.*;
 import java.util.logging.Logger;
 
 public class Main {
-    private static String PROJECT_NAME;
 
     private static List<GitCommit> retrieveCommitsWithJiraTickets(List<JiraTicket> tickets, Date maxDate) throws GitAPIException {
         List<GitCommit> commits = new ArrayList<>();
+        List<RevCommit> revCommits = new ArrayList<>();
 
         for (JiraTicket ticket : tickets) {
             GitAnalyzer analyzer = new GitAnalyzer();
@@ -40,12 +40,14 @@ public class Main {
 
             GitCommitFactory factory = GitCommitFactory.getInstance();
             for (RevCommit commit : results) {
-                commits.add(factory.parseCommit(commit, ticket.getKey()));
+                if(! revCommits.contains(commit)) {
+                    // avoid duplicates (commits that refer more than 1 Jira ticket)
+                    // it's maintained only the reference to a single Jira ticket for simplicity
+                    revCommits.add(commit);
+                    commits.add(factory.parseCommit(commit, ticket.getKey()));
+                }
             }
         }
-        /*for (GitCommit commit : commits){
-         logger.log(Level.INFO, commit.toString());
-         }*/
         commits.sort((a, b) -> {
             int aCommitTime = a.getRevCommit().getCommitTime();
             int bCommitTime = b.getRevCommit().getCommitTime();
@@ -60,12 +62,13 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         InputStream resource = Main.class.getClassLoader().getResourceAsStream("config.json");
+        String projectName;
         if (resource != null) {
             BufferedReader config = new BufferedReader(new InputStreamReader(resource));
             JSONObject obj = (JSONObject) new JSONParser().parse(config);
             String result = (String) obj.get("repo");
             String[] strings = result.split("\\\\");
-            PROJECT_NAME = strings[strings.length - 1].toUpperCase(Locale.ROOT);
+            projectName = strings[strings.length - 1].toUpperCase(Locale.ROOT);
         } else {
             throw new IllegalArgumentException("Project name not found");
         }
@@ -79,18 +82,15 @@ public class Main {
         store them sorted chronologically, both all versions and the first half of them.
          */
         logger.info("Retrieving project's releases from Jira ...");
-        VersionManager versionManager = new VersionManager(PROJECT_NAME, logger);
+        VersionManager versionManager = new VersionManager(projectName, logger);
         versionManager.setReleases();
         Date maxDate = versionManager.getLatestReleaseDate();
         logger.info("Retrieved releases: " + versionManager.getReleasesSize() + " Latest release's date: " + maxDate);
         /*
          * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
          * */
-        ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(PROJECT_NAME);
+        ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(projectName);
         logger.info("Jira tickets: " + tickets.size());
-        /*for (JiraTicket ticket : tickets)
-            logger.info(ticket.toString());
-        */
 
         /*---------------------------------------------------------------------GIT-------------------------------------------------------------*/
         /*
@@ -139,17 +139,52 @@ public class Main {
         DatasetCreator datasetCreator = new DatasetCreator(versionManager, gitManager, bugs, logger);
 
         logger.info("Dataset creation begins ...");
-        List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease, fixCommits);
+        List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease);
 
+        int numBuggy = 0;
+        List<String[]> newSet = new ArrayList<>();
+        int numDuplicates = 0;
+        for(DatasetInstance instance : dataset){
+            //check for duplicates
+            String[] newEntry = new String[]{instance.getVersion(), instance.getFilename()};
+            if(! newSet.contains(newEntry))
+                newSet.add(new String[]{instance.getVersion(), instance.getFilename()});
+            else {
+                numDuplicates++;
+            }
+            // get number of buggy instances
+            if(instance.isBuggy()){
+                numBuggy++;
+            }
+        }
+        logger.info("\nDataset size: " + dataset.size() + " instances");
+        logger.info("Buggy instances: " + numBuggy);
+        logger.info("Buggy percentage: " + ((float)numBuggy/ dataset.size())*100.0 + " %");
+        logger.info("Number of duplicated instances: " + numDuplicates);
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
-        arrayOfCSVEntry.add(new String[]{"Version", "Filename", "Buggy"});
-        logger.info("Dataset size: " + dataset.size() + " instances");
+        arrayOfCSVEntry.add(new String[]{
+                "Release",
+                "Filename",
+                "Size",
+                "LOC touched",
+                "LOC added",
+                "Max LOC added",
+                "Avg LOC added",
+                "Number of revisions",
+                "Number of fixed bugs",
+                "Number of authors",
+                "Churn",
+                "Max churn",
+                "Avg churn",
+                "Age",
+                "Buggy"});
+
         for (DatasetInstance entry : dataset) {
             arrayOfCSVEntry.add(entry.toStringArray());
         }
 
-        CSVManager.csvWriteAll(PROJECT_NAME.toLowerCase(Locale.ROOT) + "_dataset.csv", arrayOfCSVEntry);
+        CSVManager.csvWriteAll(projectName.toLowerCase(Locale.ROOT) + "_dataset.csv", arrayOfCSVEntry);
     }
 
 

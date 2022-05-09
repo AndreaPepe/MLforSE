@@ -99,7 +99,7 @@ public class VersionManager {
             //logger.info(halfVersions.toString());
             this.versionsArray = new String[this.versions.size()];
             int i = 0;
-            for(Map.Entry<String,LocalDate> entry : this.versions.entrySet()) {
+            for (Map.Entry<String, LocalDate> entry : this.versions.entrySet()) {
                 this.versionsArray[i] = entry.getKey();
                 i++;
             }
@@ -111,6 +111,7 @@ public class VersionManager {
     public Map<String, List<RevCommit>> splitCommitsPerRelease(List<RevCommit> allCommits) {
         String commitDate;
         String release;
+        List<RevCommit> commitsToRemove = new ArrayList<>();
 
         Map<String, List<RevCommit>> ret = new LinkedHashMap<>();
         for (RevCommit c : allCommits) {
@@ -127,25 +128,41 @@ public class VersionManager {
                 }
             } catch (CommitWithNoReleaseException e) {
                 // if the commit has no release, let's remove it from the RevCommit list
-                logger.info("Commit with no release: " + c.toString());
+                commitsToRemove.add(c);
             }
         }
+
+        for(RevCommit c : commitsToRemove){
+            allCommits.remove(c);
+        }
+
         logger.info(ret.keySet().toString());
         return ret;
     }
 
 
-    public List<Bug> calculateVersionsForBugs(List<Bug> bugs) throws CommitWithNoReleaseException {
+    public List<Bug> calculateVersionsForBugs(List<Bug> bugs) {
         int numberOfProportion = 0;
+        List<Bug> bugWithNoRelease = new ArrayList<>();
         for (Bug bug : bugs) {
             // find the opening version
             String openingDate = bug.getOpeningDate();
-            String openingVersion = findVersionByDate(openingDate);
+            String openingVersion = null;
+            try {
+                openingVersion = findVersionByDate(openingDate);
+            } catch (CommitWithNoReleaseException e) {
+                bugWithNoRelease.add(bug);
+            }
             bug.setOpeningVersion(openingVersion);
 
             // find the fixed version
             String fixedDate = bug.getFixDate();
-            String fixVersion = findVersionByDate(fixedDate);
+            String fixVersion = null;
+            try {
+                fixVersion = findVersionByDate(fixedDate);
+            } catch (CommitWithNoReleaseException e) {
+                bugWithNoRelease.add(bug);
+            }
             bug.setFixVersion(fixVersion);
 
             /* For now, let's take only releases with affected versions already indicated
@@ -170,7 +187,11 @@ public class VersionManager {
             }
 
         }
-        logger.info("Number of bug in which proportion has been used: " + numberOfProportion);
+
+        for(Bug bug : bugWithNoRelease){
+            bugs.remove(bug);
+        }
+        logger.info("\nNumber of bug in which proportion has been used: " + numberOfProportion);
         logger.info("Proportion p: " + this.proportion);
         return bugs;
     }
@@ -180,7 +201,7 @@ public class VersionManager {
         int indexFixed = findIndexOfVersion(bug.getFixVersion());
         int indexOpening = findIndexOfVersion(bug.getOpeningVersion());
         // calculate proportion only if the FV and the OV are different (in order to avoid infinite)
-        if(indexFixed != indexOpening) {
+        if (indexFixed != indexOpening) {
             float myProportion = (float) (indexFixed - indexInjected) / (indexFixed - indexOpening);
             this.aggregatedProportion += myProportion;
             this.numberOfBugsUsedForProportion++;
@@ -203,14 +224,15 @@ public class VersionManager {
         return aff;
     }
 
-    private int findIndexOfVersion(String version){
-        for (int i = 0; i<this.versionsArray.length; i++){
-            if (this.versionsArray[i].equals(version)){
+    private int findIndexOfVersion(String version) {
+        for (int i = 0; i < this.versionsArray.length; i++) {
+            if (this.versionsArray[i].equals(version)) {
                 return i;
             }
         }
         return -1;
     }
+
     private String findInjectedVersionUsingProportion(Bug bug) {
         String fixVer = bug.getFixVersion();
         String openVer = bug.getOpeningVersion();
@@ -218,7 +240,7 @@ public class VersionManager {
         int indexOpening = findIndexOfVersion(openVer);
         int indexInjected = (int) Math.floor(indexFix - this.proportion * (indexFix - indexOpening));
         // predicted IV = FV - (FV - OV) * p
-        if(indexInjected < 0)
+        if (indexInjected < 0)
             indexInjected = 0;
         return this.versionsArray[indexInjected];
     }
@@ -234,7 +256,7 @@ public class VersionManager {
         }
         // remove releases not considered
         affVersions.removeIf(s -> !this.versions.containsKey(s));
-        if(affVersions.isEmpty()){
+        if (affVersions.isEmpty()) {
             return false;
         }
         String injectedVersion = findInjectedVersion(affVersions);
@@ -279,7 +301,7 @@ public class VersionManager {
         }
         if (result == null) {
             // date is after the date of the latest released version, so it's part of the current release
-            logger.log(Level.SEVERE, "No VERSION FOUND! Date: " + date);
+            throw new CommitWithNoReleaseException("No release found for the commit; probably it's parte of the still unreleased version!");
         }
         return result;
     }
@@ -303,17 +325,28 @@ public class VersionManager {
     }
 
 
-    public String findNextVersion(String version){
-        for(int i = 0; i<versionsArray.length - 1; i++){
+    public String findNextVersion(String version) {
+        for (int i = 0; i < versionsArray.length - 1; i++) {
             if (versionsArray[i].equals(version))
-                return versionsArray[i+1];
+                return versionsArray[i + 1];
         }
         // the latest version
         return null;
     }
 
-    public int getReleasesSize(){
+    public int getReleasesSize() {
         return this.versions.size();
     }
 
+    public Map<String, LocalDate> getHalfVersions() {
+        return this.halfVersions;
+    }
+
+    public LocalDate getReleaseDateOfVersion (String version){
+        for (Map.Entry<String, LocalDate> entry: this.versions.entrySet()){
+            if(entry.getKey().equals(version))
+                return entry.getValue();
+        }
+        return null;
+    }
 }

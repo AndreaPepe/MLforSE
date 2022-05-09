@@ -17,6 +17,7 @@ public class DatasetInstance {
     private int locTouched;                     // LOC touched (added + deleted + modified)
     private int numberOfRevisions;              // number of commits
     private int numberOfFixedBugs;              // number of bug fixed
+    private Set<String> fixedBugs;              // fixedBugs
     private Set<String> authors;                // set of authors that worked on the file
     private int locAdded;                       // number of LOC added over revisions
     private int maxLocAdded;                    // maximum number of loc added in a revision
@@ -31,17 +32,47 @@ public class DatasetInstance {
         this.filename = filename;
         this.authors = new HashSet<>();
         this.creationDate = creationDate;
-        this.buggy = buggy;
         this.previousNames = new HashSet<>();
+        this.fixedBugs = new HashSet<>();
+
+        // features
+        this.size = 0;
+        this.locTouched = 0;
+        this.locAdded = 0;
+        this.maxLocAdded = 0;
+        this.avgLocAdded = 0f;
+        this.numberOfRevisions = 1;
+        this.numberOfFixedBugs = 0;
+        this.churn = 0;
+        this.maxChurn = 0;
+        this.avgChurn = 0f;
+        this.age = 0;
+        this.buggy = buggy;
     }
 
-    public DatasetInstance(DatasetInstance old, String newRelease){
+    public DatasetInstance(DatasetInstance old, String newRelease) {
+        // this is the only change
         this.version = newRelease;
+
         this.filename = old.getFilename();
         this.creationDate = old.getCreationDate();
-        this.buggy = old.isBuggy();
         this.authors = old.getAuthors();
         this.previousNames = old.getPreviousNames();
+        this.fixedBugs = old.getFixedBugs();
+
+        // features
+        this.size = old.getSize();
+        this.locTouched = old.getLocTouched();
+        this.locAdded = old.getLocAdded();
+        this.maxLocAdded = old.getMaxLocAdded();
+        this.avgLocAdded = old.getAvgLocAdded();
+        this.numberOfRevisions = old.getNumberOfRevisions();
+        this.numberOfFixedBugs = old.getNumberOfFixedBugs();
+        this.churn = old.getChurn();
+        this.maxChurn = old.getMaxChurn();
+        this.avgChurn = old.getAvgChurn();
+        this.age = old.getAge();
+        this.buggy = old.isBuggy();
     }
 
     public String getVersion() {
@@ -66,10 +97,6 @@ public class DatasetInstance {
 
     public void setBuggy(boolean buggy) {
         this.buggy = buggy;
-    }
-
-    public String[] toStringArray() {
-        return new String[]{this.version, this.filename, String.valueOf(this.buggy)};
     }
 
     public LocalDate getCreationDate() {
@@ -128,7 +155,7 @@ public class DatasetInstance {
         this.authors = authors;
     }
 
-    public void addAuthor(String author){
+    public void addAuthor(String author) {
         this.authors.add(author);
     }
 
@@ -188,7 +215,93 @@ public class DatasetInstance {
         this.age = age;
     }
 
-    public void addPreviousName(String name){
+    public Set<String> getFixedBugs() {
+        return fixedBugs;
+    }
+
+    public void setFixedBugs(Set<String> fixedBugs) {
+        this.fixedBugs = fixedBugs;
+    }
+
+    public void addPreviousName(String name) {
         this.previousNames.add(name);
+    }
+
+    // TODO: remove this feature or handle it better
+    public void addFixedBug(String bugTicket) {
+        if (!this.fixedBugs.contains(bugTicket)) {
+            this.fixedBugs.add(bugTicket);
+            numberOfFixedBugs++;
+        }
+    }
+
+    public void addChurn(int churn) {
+        this.churn += churn;
+        this.maxChurn = Math.max(this.maxChurn, churn);
+        this.avgChurn = (float) this.churn / this.numberOfRevisions;
+    }
+
+    public void incrementNumberOfRevisions() {
+        this.numberOfRevisions++;
+    }
+
+    public void addLocTouched(int locTouched) {
+        this.locTouched += locTouched;
+    }
+
+    public void addLocAdded(int locAdded) {
+        this.locAdded += locAdded;
+        this.maxLocAdded = Math.max(this.maxLocAdded, locAdded);
+        this.avgLocAdded = (float) this.locAdded / this.numberOfRevisions;
+    }
+
+
+    /**
+     * This method transforms the DatasetInstance class in an array of Strings,
+     * representing an instance in a CSV file dataset.
+     * Columns are:
+     * - version
+     * - filepath
+     * - size
+     * - LOC touched
+     * - LOC added
+     * - max LOC added
+     * - avg LOC added
+     * - number of revisions
+     * - number of fixed bugs
+     * - number of authors
+     * - churn
+     * - max churn
+     * - avg churn
+     * - age
+     * - buggy {yes, no}
+     *
+     * @return Array of strings to be inserted in a CSV file
+     */
+    public String[] toStringArray() {
+        String buggy;
+        if (this.buggy)
+            buggy = "yes";
+        else
+            buggy = "no";
+
+
+        return new String[]{
+                this.version,
+                this.filename,
+                Integer.toString(this.size),
+                Integer.toString(this.locTouched),
+                Integer.toString(this.locAdded),
+                Integer.toString(this.maxLocAdded),
+                String.format("%f", this.avgLocAdded),
+                Integer.toString(this.numberOfRevisions),
+                Integer.toString(this.numberOfFixedBugs),
+                Integer.toString(this.authors.size()),
+                Integer.toString(this.churn),
+                Integer.toString(this.maxChurn),
+                String.format("%f", this.avgChurn),
+                Integer.toString(this.age),
+                buggy
+        };
     }
 }

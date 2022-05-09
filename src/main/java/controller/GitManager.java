@@ -19,19 +19,13 @@ import java.util.List;
 public class GitManager {
 
     private final Git git;
+    private DiffFormatter df;
 
     public GitManager(Git git) {
         this.git = git;
     }
 
     public List<DiffEntry> makeDiff(RevCommit previous, RevCommit current) throws IOException {
-        DiffFormatter df = new DiffFormatter(DisabledOutputStream.INSTANCE);
-        df.setRepository(git.getRepository());
-        df.setDiffComparator(RawTextComparator.DEFAULT);
-        // filter only java files
-        df.setPathFilter(PathSuffixFilter.create(".java"));
-        // set the detection of renamed files
-        df.setDetectRenames(true);
 
         List<DiffEntry> entries;
         if (previous == null) {
@@ -84,5 +78,18 @@ public class GitManager {
         return prev;
       }*/
 
+    public DiffFormatter getDiffFormatter(){
+        return this.df;
+    }
+
+    public void setDiffFormatter(){
+        df = new DiffFormatter(DisabledOutputStream.INSTANCE);
+        df.setRepository(git.getRepository());
+        df.setDiffComparator(RawTextComparator.DEFAULT);
+        // filter only java files
+        df.setPathFilter(PathSuffixFilter.create(".java"));
+        // set the detection of renamed files
+        df.setDetectRenames(true);
+    }
 
 }

@@ -4,11 +4,15 @@ import model.Bug;
 import model.DatasetInstance;
 import model.GitCommit;
 import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.Period;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.logging.Logger;
@@ -32,13 +36,13 @@ public class DatasetCreator {
     /**
      * This method analyze the entire git log, making diff between subsequents
      * commits and reconstructing the history of each file.
-     * It also computes metrics and detect buggyness.
+     * It also computes metrics and detect buggy files.
      *
-     * @param gitLog     mapping of release with commits
-     * @param fixCommits a list of chronologically sorted fix commits
+     * @param gitLog mapping of release with commits
      * @return the list of instances for the dataset
      */
-    public List<DatasetInstance> computeDataset(Map<String, List<RevCommit>> gitLog, List<GitCommit> fixCommits) throws IOException {
+    public List<DatasetInstance> computeDataset(Map<String, List<RevCommit>> gitLog) throws IOException {
+        gitManager.setDiffFormatter(); // prepare the diff formatter to filter only java files, excluding tests
         dataset = new ArrayList<>();
         RevCommit prev = null;
         for (Map.Entry<String, List<RevCommit>> release : gitLog.entrySet()) {
@@ -46,19 +50,26 @@ public class DatasetCreator {
             logger.info("Release: " + release.getKey() + " Commits: " + release.getValue().size());
             for (RevCommit current : release.getValue()) {
                 // for each commit
-                dataset.addAll(analyzeCommitPair(release.getKey(), prev, current));
+                analyzeCommitPair(release.getKey(), prev, current);
 
                 prev = current;
             }
-            //TODO: at the end of each release, copy all the existing instances in the following release
+
+            /*
+            At the end of each release (except the last one), copy each file present in the dataset
+            as a file present in the next release;
+            deletion, modification and so on will count on this!
+             */
             String nextRelease = versionManager.findNextVersion(release.getKey());
-            if(nextRelease != null){
+            if (nextRelease != null) {
                 // only if the current release is not the last one
                 List<DatasetInstance> instancesAtTheEndOfTheRelease = new ArrayList<>();
 
-                for (DatasetInstance instance : dataset){
-                    if (instance.getVersion().equals(release.getKey())){
+                for (DatasetInstance instance : dataset) {
+                    if (instance.getVersion().equals(release.getKey())) {
                         instancesAtTheEndOfTheRelease.add(new DatasetInstance(instance, nextRelease));
+                        // compute age for the instances of the current release
+                        computeAge(instance, release.getKey());
                     }
                 }
 
@@ -67,59 +78,53 @@ public class DatasetCreator {
 
         }
 
+        // cut the dataset to the first half of releases
+        cutDatasetInHalf();
         return dataset;
     }
 
-    private List<DatasetInstance> analyzeCommitPair(String release, RevCommit prev, RevCommit current) throws IOException {
+    private void analyzeCommitPair(String release, RevCommit prev, RevCommit current) throws IOException {
         List<DiffEntry> diffs = gitManager.makeDiff(prev, current);
-        List<DatasetInstance> instances = new ArrayList<>();
-        boolean isFixCommit = isFixCommit(current);
         for (DiffEntry diff : diffs) {
             switch (diff.getChangeType()) {
                 case ADD -> handleAdd(diff, release, current);
-                case COPY -> handleCopy(diff, release);
+                case COPY -> handleCopy(diff, release, current);
                 case DELETE -> handleDelete(diff, release);
-                case MODIFY -> handleModify(diff, release, current, isFixCommit);
-                case RENAME -> handleRename(diff, release);
+                case MODIFY -> handleModify(diff, release, current);
+                case RENAME -> handleRename(diff, release, current);
             }
         }
-        return instances;
     }
-
-    private boolean isFixCommit(RevCommit current) {
-        for (Bug bug : bugs) {
-            if (current.equals(bug.getFixCommit().getRevCommit()))
-                return true;
-            else if (bug.getOtherCommits() != null) {
-                for (GitCommit otherCommit : bug.getOtherCommits()) {
-                    if (current.equals(otherCommit.getRevCommit()))
-                        return true;
-                }
-            }
-        }
-        return false;
-    }
-
 
     private void handleAdd(DiffEntry entry, String release, RevCommit commit) {
         PersonIdent author = commit.getAuthorIdent();
         LocalDate creationDate = author.getWhen().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
         DatasetInstance instance = new DatasetInstance(release, entry.getNewPath(), creationDate, false);
         instance.addAuthor(author.getName());
-        // TODO:manage LOC changes
+        // number of Revisions does not need to be incremented because it's already initialized to 1
+        computeLocChanges(entry, instance);
         dataset.add(instance);
     }
 
-    private void handleCopy(DiffEntry entry, String release) {
+    private void handleCopy(DiffEntry entry, String release, RevCommit commit) {
+        PersonIdent author = commit.getAuthorIdent();
         // copy an existing file to a new location maintaining the content
-        // let's add the new file, but we must also transfer buggyness of the existing file
+        // let's add the new file, but we must also transfer the buggy attribute of the existing file
         String oldName = entry.getOldPath();
         String newName = entry.getNewPath();
         int idx = getLatestInstanceByName(oldName);
-        if(idx < 0)
+        if (idx < 0)
             return;
         DatasetInstance newInstance = new DatasetInstance(dataset.get(idx), release);
         newInstance.setFilename(newName);
+
+        // increment the number of revisions of both instances
+        dataset.get(idx).incrementNumberOfRevisions();
+        newInstance.incrementNumberOfRevisions();
+        // add the author for both instances
+        dataset.get(idx).addAuthor(author.getName());
+        newInstance.addAuthor(author.getName());
         dataset.add(newInstance);
     }
 
@@ -131,10 +136,10 @@ public class DatasetCreator {
         if (this.dataset.get(idx).getVersion().equals(release))
             dataset.remove(idx);
 
-        //TODO: update age maybe
+        // no stat calculation is needed because the instance will be removed from the dataset
     }
 
-    private void handleModify(DiffEntry entry, String release, RevCommit commit, boolean isFixCommit) {
+    private void handleModify(DiffEntry entry, String release, RevCommit commit) {
         int indexLatest = getLatestInstanceByName(entry.getNewPath());
         if (indexLatest < 0) {
             // file does not exist
@@ -150,41 +155,69 @@ public class DatasetCreator {
             this.dataset.add(instance);
         }
 
-        // Get bugs for detection of BUGGYNESS
+        // Get bugs in order to detect if the instance is BUGGY
         List<Bug> bugs = getBugsOfCommit(this.bugs, commit);
         Set<String> affectedVersions = new HashSet<>();
         for (Bug bug : bugs) {
             affectedVersions.addAll(bug.getAffectedVersions());
         }
 
+        int idx;
         // Set buggy true
         for (String av : affectedVersions) {
-            //TODO: check also for previous filenames, not only entry.getNewPath()
-            int idx = getLatestInstanceByNameAndRelease(entry.getNewPath(), av);
+            idx = getLatestInstanceByNameAndRelease(entry.getNewPath(), av);
             if (idx >= 0)
                 this.dataset.get(idx).setBuggy(true);
+            // Check also for previous names of the file (handled with RENAME commits)
+            for (String prevName : instance.getPreviousNames()) {
+                idx = getLatestInstanceByNameAndRelease(prevName, av);
+                if (idx >= 0)
+                    this.dataset.get(idx).setBuggy(true);
+            }
         }
 
-        //TODO: update stats like set of bug fixed, ...
+        //TODO: for now set all bugs, but in the future let's filter only bugs that really affected the instance
+
+        // add fixed bugs
+        for (Bug bug : bugs) {
+            instance.addFixedBug(bug.getTicket().getKey());
+        }
+
+        //increment number of revisions
+        // it's important to do it before loc changes computation
+        instance.incrementNumberOfRevisions();
+        computeLocChanges(entry, instance);
+        // add author
         instance.addAuthor(commit.getAuthorIdent().getName());
-        //TODO: compute LOC changes and so on ...
     }
 
-    private void handleRename(DiffEntry entry, String release) {
+    private void handleRename(DiffEntry entry, String release, RevCommit commit) {
+        PersonIdent author = commit.getAuthorIdent();
         int idx = getLatestInstanceByName(entry.getOldPath());
-        if(idx < 0)
+        if (idx < 0)
             return;
-        if (dataset.get(idx).getVersion().equals(release)){
+        if (dataset.get(idx).getVersion().equals(release)) {
             // if in the same release, change only the name
             dataset.get(idx).addPreviousName(entry.getOldPath());
             dataset.get(idx).setFilename(entry.getNewPath());
-        }else{
+            // add author
+            dataset.get(idx).addAuthor(author.getName());
+            // increment number of revisions
+            dataset.get(idx).incrementNumberOfRevisions();
+        } else {
             DatasetInstance newInstance = new DatasetInstance(dataset.get(idx), release);
             newInstance.addPreviousName(entry.getOldPath());
             newInstance.setFilename(entry.getNewPath());
             dataset.remove(idx);
+            //add new author
+            newInstance.addAuthor(author.getName());
+            // increment number of revisions
+            newInstance.incrementNumberOfRevisions();
             dataset.add(newInstance);
         }
+
+
+        //TODO: check if there is need to calculate stats
     }
 
     private int getLatestInstanceByName(String filename) {
@@ -224,5 +257,78 @@ public class DatasetCreator {
             }
         }
         return new ArrayList<>(bugsRetrieved);
+    }
+
+    private void cutDatasetInHalf() {
+        int index = 0;
+        int i = 0;
+        Set<String> halfVersions = versionManager.getHalfVersions().keySet();
+        for (DatasetInstance instance : this.dataset) {
+            if (!halfVersions.contains(instance.getVersion())) {
+                // index is the first instance with the version to not be considered
+                index = i;
+                break;
+            }
+            i++;
+        }
+        this.dataset = this.dataset.subList(0, index - 1);
+    }
+
+
+    /* -------------------------------------------------------------------------- FEATURES COMPUTATION ----------------------------------------------------------------*/
+
+    private void computeLocChanges(DiffEntry diff, DatasetInstance instance) {
+        DiffFormatter df = gitManager.getDiffFormatter();
+        int size = instance.getSize();
+        int linesAdded = 0;
+        int linesDeleted = 0;
+        try {
+            List<Edit> edits = df.toFileHeader(diff).toEditList();
+            for (Edit edit : edits) {
+                switch (edit.getType()) {
+                    case INSERT -> // new LOC have been inserted
+                            linesAdded += edit.getLengthB() - edit.getLengthA();
+                    case DELETE -> // LOC have been deleted
+                            linesDeleted += (edit.getLengthA() - edit.getLengthB());
+                    case REPLACE -> {
+                        //LOCs have been modified
+                        if (edit.getLengthA() < edit.getLengthB()) {
+                            // the new version is bigger; so we have added lines
+                            linesAdded += edit.getLengthB() - edit.getLengthA();
+                        } else if (edit.getLengthA() > edit.getLengthB()) {
+                            // deleted lines
+                            linesDeleted += (edit.getLengthA() - edit.getLengthB());
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.info("IOException computing LOCs");
+
+        }
+        int modifiedLines = linesAdded + linesDeleted;
+        int churn = linesAdded - linesDeleted;
+        size += churn; // compute the new size;
+        if (size < 0)
+            size = 0;
+        instance.setSize(size);
+        instance.addChurn(churn);
+        instance.addLocTouched(modifiedLines);
+        instance.addLocAdded(linesAdded);
+    }
+
+
+    private void computeAge(DatasetInstance instance, String release) {
+        LocalDate creationDate = instance.getCreationDate();
+        LocalDate releaseDate = versionManager.getReleaseDateOfVersion(release);
+        if (releaseDate == null) {
+            // no release found;
+            return;
+        }
+        long numDays = Duration.between(creationDate.atStartOfDay(), releaseDate.atStartOfDay()).toDays();
+        if(numDays < 0)
+            numDays *= -1;
+        int numWeeks = (int) Math.ceil((float) numDays / 7);
+        instance.setAge(numWeeks);
     }
 }
