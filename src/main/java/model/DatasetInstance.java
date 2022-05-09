@@ -279,11 +279,11 @@ public class DatasetInstance {
      * @return Array of strings to be inserted in a CSV file
      */
     public String[] toStringArray() {
-        String buggy;
+        String isBuggy;
         if (this.buggy)
-            buggy = "yes";
+            isBuggy = "yes";
         else
-            buggy = "no";
+            isBuggy = "no";
 
 
         return new String[]{
@@ -301,7 +301,7 @@ public class DatasetInstance {
                 Integer.toString(this.maxChurn),
                 String.format("%f", this.avgChurn),
                 Integer.toString(this.age),
-                buggy
+                isBuggy
         };
     }
 }

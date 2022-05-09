@@ -6,6 +6,7 @@ import exceptions.CSVException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 
 public class CSVManager {
@@ -19,7 +20,7 @@ public class CSVManager {
             If the file already exists, delete it; create the file and write it.
             */
         File file = new File(filename);
-        if (file.exists() && !file.delete()) {
+        if (!Files.deleteIfExists(file.toPath())) {
             throw new CSVException("Unable to delete file");
         }
         FileWriter writer = new FileWriter(file);

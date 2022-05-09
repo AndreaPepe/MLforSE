@@ -4,7 +4,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
-import org.eclipse.jgit.revwalk.filter.CommitterRevFilter;
 
 import java.util.ArrayList;
 import java.util.Date;

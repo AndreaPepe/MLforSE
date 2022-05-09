@@ -4,20 +4,23 @@ import model.Bug;
 import model.GitCommit;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 public class BugManager {
+
+    private BugManager() {
+    }
 
     /**
      * If the commit contains the ticket (retrieved by Jira) of the bug, and if the fix date
      * of Jira corresponds to the date of the commit, then the commit is classified as the fix commit of the bug.
      * Otherwise, the commit is classified as 'otherCommit'.
      *
-     * @param bugs list of bugs
+     * @param bugs    list of bugs
      * @param commits list of commits
-     * @return The modified list of bugs
      */
-    public static List<Bug> setFixCommitAndOtherCommits(List<Bug> bugs, List<GitCommit> commits) {
+    public static void setFixCommitAndOtherCommits(List<Bug> bugs, List<GitCommit> commits) {
         String commitDate;
         for (Bug bug : bugs) {
             for (GitCommit commit : commits) {
@@ -33,7 +36,6 @@ public class BugManager {
             }
         }
 
-        return bugs;
     }
 
     /**
@@ -47,6 +49,7 @@ public class BugManager {
 
     public static void patchFixCommit(List<Bug> bugs) {
         removeBugsWithNoCommits(bugs);
+        List<Bug> bugsToBeRemoved = new ArrayList<>();
         for (Bug bug : bugs) {
             if (bug.getFixCommit() == null) {
                 // get the other commit with last date
@@ -59,10 +62,13 @@ public class BugManager {
                     }
                 }
                 if (candidateFix == null)
-                    bugs.remove(bug);
+                    bugsToBeRemoved.add(bug);
                 else
                     bug.setFixCommit(candidateFix);
             }
         }
+
+        for (Bug bug : bugsToBeRemoved)
+            bugs.remove(bug);
     }
 }

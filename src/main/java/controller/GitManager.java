@@ -47,37 +47,6 @@ public class GitManager {
 
     }
 
-
-    private RevCommit findPreviousCommit(RevCommit commit, List<RevCommit> list) {
-        RevCommit prev = null;
-        for (RevCommit current : list) {
-            if (current.getName().equals(commit.getName())) {
-                return prev;
-            }
-            prev = current;
-        }
-        return prev;
-    }
-       /* RevWalk revWalk = new RevWalk(git.getRepository());
-        // sort commit by ascending date
-        revWalk.sort(RevSort.COMMIT_TIME_DESC);
-        revWalk.sort(RevSort.REVERSE);
-        RevCommit prev = null;
-        try {
-            RevCommit current = revWalk.next();
-            while (current != null) {
-                if (current.equals(commit)) {
-                    break;
-                }
-                prev = current;
-                current = revWalk.next();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return prev;
-      }*/
-
     public DiffFormatter getDiffFormatter(){
         return this.df;
     }

@@ -53,12 +53,12 @@ public class VersionManager {
     public void setReleases() {
         String pathname = projectName.toLowerCase(Locale.ROOT) + RELEASES_PATH;
         try {
-            List<Map.Entry<String, LocalDate>> versions = new ArrayList<>(RetrieveReleases.getReleases(projectName));
-            versions.sort(Map.Entry.comparingByValue());
+            List<Map.Entry<String, LocalDate>> releases = new ArrayList<>(RetrieveReleases.getReleases(projectName));
+            releases.sort(Map.Entry.comparingByValue());
 
             Map<String, LocalDate> sortedVersions = new LinkedHashMap<>();
             List<LocalDate> addedDates = new ArrayList<>();
-            for (Map.Entry<String, LocalDate> entry : versions) {
+            for (Map.Entry<String, LocalDate> entry : releases) {
                 if (!addedDates.contains(entry.getValue())) {
                     // remove releases that have the same release date
                     sortedVersions.put(entry.getKey(), entry.getValue());
@@ -76,11 +76,11 @@ public class VersionManager {
             CSVManager.csvWriteAll(pathname, lines);
 
             /* maintain only the first half of releases */
-            Map<String, LocalDate> halfVersions = new LinkedHashMap<>();
+            Map<String, LocalDate> halfReleases = new LinkedHashMap<>();
             int size = sortedVersions.size();
             int count = 0;
             for (Map.Entry<String, LocalDate> entry : sortedVersions.entrySet()) {
-                halfVersions.put(entry.getKey(), entry.getValue());
+                halfReleases.put(entry.getKey(), entry.getValue());
                 count++;
                 if (count >= round(size / 2.0)) {
                     break;
@@ -88,15 +88,13 @@ public class VersionManager {
             }
 
             this.versions = sortedVersions;
-            this.halfVersions = halfVersions;
+            this.halfVersions = halfReleases;
             LocalDate latestDate = null;
             Iterator<Map.Entry<String, LocalDate>> iterator = sortedVersions.entrySet().iterator();
             while (iterator.hasNext())
                 latestDate = iterator.next().getValue();
             assert latestDate != null;
             this.latestReleaseDate = Date.from(latestDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-            /*----LOG----*/
-            //logger.info(halfVersions.toString());
             this.versionsArray = new String[this.versions.size()];
             int i = 0;
             for (Map.Entry<String, LocalDate> entry : this.versions.entrySet()) {
@@ -132,11 +130,10 @@ public class VersionManager {
             }
         }
 
-        for(RevCommit c : commitsToRemove){
+        for (RevCommit c : commitsToRemove) {
             allCommits.remove(c);
         }
 
-        logger.info(ret.keySet().toString());
         return ret;
     }
 
@@ -188,11 +185,11 @@ public class VersionManager {
 
         }
 
-        for(Bug bug : bugWithNoRelease){
+        for (Bug bug : bugWithNoRelease) {
             bugs.remove(bug);
         }
-        logger.info("\nNumber of bug in which proportion has been used: " + numberOfProportion);
-        logger.info("Proportion p: " + this.proportion);
+        logger.info(String.format("\nNumber of bug in which proportion has been used: %d", numberOfProportion));
+        logger.info(String.format("Proportion p: %f", this.proportion));
         return bugs;
     }
 
@@ -342,9 +339,9 @@ public class VersionManager {
         return this.halfVersions;
     }
 
-    public LocalDate getReleaseDateOfVersion (String version){
-        for (Map.Entry<String, LocalDate> entry: this.versions.entrySet()){
-            if(entry.getKey().equals(version))
+    public LocalDate getReleaseDateOfVersion(String version) {
+        for (Map.Entry<String, LocalDate> entry : this.versions.entrySet()) {
+            if (entry.getKey().equals(version))
                 return entry.getValue();
         }
         return null;

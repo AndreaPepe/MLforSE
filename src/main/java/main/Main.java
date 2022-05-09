@@ -22,6 +22,7 @@ import org.json.simple.parser.JSONParser;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -85,12 +86,12 @@ public class Main {
         VersionManager versionManager = new VersionManager(projectName, logger);
         versionManager.setReleases();
         Date maxDate = versionManager.getLatestReleaseDate();
-        logger.info("Retrieved releases: " + versionManager.getReleasesSize() + " Latest release's date: " + maxDate);
+        logger.info(String.format("Retrieved releases: %d\tLatest release date: %s", versionManager.getReleasesSize(), maxDate.toString()));
         /*
          * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
          * */
         ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(projectName);
-        logger.info("Jira tickets: " + tickets.size());
+        logger.info(String.format("Jira tickets: %d", tickets.size()));
 
         /*---------------------------------------------------------------------GIT-------------------------------------------------------------*/
         /*
@@ -100,7 +101,8 @@ public class Main {
         logger.info("\nRetrieving commits from Git ...");
         List<GitCommit> fixCommits = retrieveCommitsWithJiraTickets(tickets, maxDate);
         List<RevCommit> allCommits = new GitAnalyzer().getDatetimeSortedGitLog(GitSingleton.getInstance().getGit(), maxDate);
-        logger.info("Total commits: " + allCommits.size() + " Fix commits: " + fixCommits.size());
+        logger.info(String.format("Total commits: %d", allCommits.size()));
+        logger.info(String.format("Fix commits: %d", fixCommits.size()));
 
         /*---------------------------------------------------------------------BUGS----------------------------------------------------------*/
 
@@ -115,7 +117,7 @@ public class Main {
 
         /* now, remove bugs with no bounded commit and add metadata on which is its fixing commit
          * That can be chosen in 2 ways:
-         *  - if Jira fix date corresponds to commit date, then that commit is the fix commit;
+         *  - if Jira fix date corresponds to commit date, then that commit is the fix commit
          *  - otherwise, the latest commit referring that bug is chosen as FixCommit
          *
          * Bugs with no such commits are removed from the list.
@@ -124,10 +126,10 @@ public class Main {
         BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
-        logger.info("Identify FV, OV, AVs and IV for bugs. DONE");
+        logger.info("\nIdentification of FV, OV, AVs and IV for bugs. DONE");
 
         Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
-        logger.info("Split commits by releases. DONE");
+        logger.info("\nSplit commits by releases. DONE");
 
         /*-----------------------------------------------GIT FILES------------------------------------------------------*/
 
@@ -138,7 +140,7 @@ public class Main {
         GitManager gitManager = new GitManager(GitSingleton.getInstance().getGit());
         DatasetCreator datasetCreator = new DatasetCreator(versionManager, gitManager, bugs, logger);
 
-        logger.info("Dataset creation begins ...");
+        logger.info("\nDataset creation begins ...\n");
         List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease);
 
         int numBuggy = 0;
@@ -157,10 +159,10 @@ public class Main {
                 numBuggy++;
             }
         }
-        logger.info("\nDataset size: " + dataset.size() + " instances");
-        logger.info("Buggy instances: " + numBuggy);
-        logger.info("Buggy percentage: " + ((float)numBuggy/ dataset.size())*100.0 + " %");
-        logger.info("Number of duplicated instances: " + numDuplicates);
+        logger.info(String.format("\nDataset size: %d instances", dataset.size()));
+        logger.info(String.format("Buggy instances: %d", numBuggy));
+        logger.info(String.format("Buggy percentage: %f %%", ((float)numBuggy/ dataset.size())*100.0));
+        logger.info(String.format("Number of duplicated instances: %d", numDuplicates));
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
         arrayOfCSVEntry.add(new String[]{

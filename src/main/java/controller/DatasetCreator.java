@@ -12,7 +12,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.Period;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.logging.Logger;
@@ -47,7 +46,7 @@ public class DatasetCreator {
         RevCommit prev = null;
         for (Map.Entry<String, List<RevCommit>> release : gitLog.entrySet()) {
             // for each release
-            logger.info("Release: " + release.getKey() + " Commits: " + release.getValue().size());
+            logger.info(String.format("Release: %s\tCommits: %d", release.getKey(), release.getValue().size()));
             for (RevCommit current : release.getValue()) {
                 // for each commit
                 analyzeCommitPair(release.getKey(), prev, current);
@@ -55,10 +54,10 @@ public class DatasetCreator {
                 prev = current;
             }
 
-            /*
-            At the end of each release (except the last one), copy each file present in the dataset
-            as a file present in the next release;
-            deletion, modification and so on will count on this!
+
+            /* At the end of each release (except the last one), copy each file present in the dataset
+             as a file present in the next release.
+             Deletion, modification and so on will count on this!
              */
             String nextRelease = versionManager.findNextVersion(release.getKey());
             if (nextRelease != null) {
@@ -156,9 +155,9 @@ public class DatasetCreator {
         }
 
         // Get bugs in order to detect if the instance is BUGGY
-        List<Bug> bugs = getBugsOfCommit(this.bugs, commit);
+        List<Bug> commitBugs = getBugsOfCommit(this.bugs, commit);
         Set<String> affectedVersions = new HashSet<>();
-        for (Bug bug : bugs) {
+        for (Bug bug : commitBugs) {
             affectedVersions.addAll(bug.getAffectedVersions());
         }
 
@@ -282,24 +281,33 @@ public class DatasetCreator {
         int size = instance.getSize();
         int linesAdded = 0;
         int linesDeleted = 0;
+        int currentAdd = 0;
+        int currentDelete = 0;
         try {
             List<Edit> edits = df.toFileHeader(diff).toEditList();
             for (Edit edit : edits) {
                 switch (edit.getType()) {
-                    case INSERT -> // new LOC have been inserted
-                            linesAdded += edit.getLengthB() - edit.getLengthA();
-                    case DELETE -> // LOC have been deleted
-                            linesDeleted += (edit.getLengthA() - edit.getLengthB());
+                    case INSERT -> {// new LOC have been inserted
+                        currentAdd = edit.getLengthB() - edit.getLengthA();
+                        linesAdded += currentAdd;
+                    }
+                    case DELETE -> { // LOC have been deleted
+                        currentDelete =  edit.getLengthA() - edit.getLengthB();
+                        linesDeleted += currentDelete;
+                    }
                     case REPLACE -> {
                         //LOCs have been modified
                         if (edit.getLengthA() < edit.getLengthB()) {
                             // the new version is bigger; so we have added lines
-                            linesAdded += edit.getLengthB() - edit.getLengthA();
+                            currentAdd = edit.getLengthB() - edit.getLengthA();
+                            linesAdded += currentAdd;
                         } else if (edit.getLengthA() > edit.getLengthB()) {
                             // deleted lines
-                            linesDeleted += (edit.getLengthA() - edit.getLengthB());
+                            currentDelete = edit.getLengthA() - edit.getLengthB();
+                            linesDeleted += currentDelete;
                         }
                     }
+                    default -> {}
                 }
             }
         } catch (IOException e) {
@@ -308,7 +316,8 @@ public class DatasetCreator {
         }
         int modifiedLines = linesAdded + linesDeleted;
         int churn = linesAdded - linesDeleted;
-        size += churn; // compute the new size;
+        // compute the new size
+        size += churn;
         if (size < 0)
             size = 0;
         instance.setSize(size);
@@ -322,11 +331,11 @@ public class DatasetCreator {
         LocalDate creationDate = instance.getCreationDate();
         LocalDate releaseDate = versionManager.getReleaseDateOfVersion(release);
         if (releaseDate == null) {
-            // no release found;
+            // no release found
             return;
         }
         long numDays = Duration.between(creationDate.atStartOfDay(), releaseDate.atStartOfDay()).toDays();
-        if(numDays < 0)
+        if (numDays < 0)
             numDays *= -1;
         int numWeeks = (int) Math.ceil((float) numDays / 7);
         instance.setAge(numWeeks);
