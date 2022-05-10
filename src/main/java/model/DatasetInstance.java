@@ -16,8 +16,6 @@ public class DatasetInstance {
     private int size;                           // LOC
     private int locTouched;                     // LOC touched (added + deleted + modified)
     private int numberOfRevisions;              // number of commits
-    private int numberOfFixedBugs;              // number of bug fixed
-    private Set<String> fixedBugs;              // fixedBugs
     private Set<String> authors;                // set of authors that worked on the file
     private int locAdded;                       // number of LOC added over revisions
     private int maxLocAdded;                    // maximum number of loc added in a revision
@@ -33,7 +31,6 @@ public class DatasetInstance {
         this.authors = new HashSet<>();
         this.creationDate = creationDate;
         this.previousNames = new HashSet<>();
-        this.fixedBugs = new HashSet<>();
 
         // features
         this.size = 0;
@@ -42,7 +39,6 @@ public class DatasetInstance {
         this.maxLocAdded = 0;
         this.avgLocAdded = 0f;
         this.numberOfRevisions = 1;
-        this.numberOfFixedBugs = 0;
         this.churn = 0;
         this.maxChurn = 0;
         this.avgChurn = 0f;
@@ -58,7 +54,6 @@ public class DatasetInstance {
         this.creationDate = old.getCreationDate();
         this.authors = old.getAuthors();
         this.previousNames = old.getPreviousNames();
-        this.fixedBugs = old.getFixedBugs();
 
         // features
         this.size = old.getSize();
@@ -67,7 +62,6 @@ public class DatasetInstance {
         this.maxLocAdded = old.getMaxLocAdded();
         this.avgLocAdded = old.getAvgLocAdded();
         this.numberOfRevisions = old.getNumberOfRevisions();
-        this.numberOfFixedBugs = old.getNumberOfFixedBugs();
         this.churn = old.getChurn();
         this.maxChurn = old.getMaxChurn();
         this.avgChurn = old.getAvgChurn();
@@ -139,14 +133,6 @@ public class DatasetInstance {
         this.numberOfRevisions = numberOfRevisions;
     }
 
-    public int getNumberOfFixedBugs() {
-        return numberOfFixedBugs;
-    }
-
-    public void setNumberOfFixedBugs(int numberOfFixedBugs) {
-        this.numberOfFixedBugs = numberOfFixedBugs;
-    }
-
     public Set<String> getAuthors() {
         return authors;
     }
@@ -215,24 +201,8 @@ public class DatasetInstance {
         this.age = age;
     }
 
-    public Set<String> getFixedBugs() {
-        return fixedBugs;
-    }
-
-    public void setFixedBugs(Set<String> fixedBugs) {
-        this.fixedBugs = fixedBugs;
-    }
-
-    public void addPreviousName(String name) {
-        this.previousNames.add(name);
-    }
-
-    // TODO: remove this feature or handle it better
-    public void addFixedBug(String bugTicket) {
-        if (!this.fixedBugs.contains(bugTicket)) {
-            this.fixedBugs.add(bugTicket);
-            numberOfFixedBugs++;
-        }
+    public void addPreviousName(String oldPath) {
+        this.previousNames.add(oldPath);
     }
 
     public void addChurn(int churn) {
@@ -268,7 +238,6 @@ public class DatasetInstance {
      * - max LOC added
      * - avg LOC added
      * - number of revisions
-     * - number of fixed bugs
      * - number of authors
      * - churn
      * - max churn
@@ -295,7 +264,6 @@ public class DatasetInstance {
                 Integer.toString(this.maxLocAdded),
                 String.format("%f", this.avgLocAdded),
                 Integer.toString(this.numberOfRevisions),
-                Integer.toString(this.numberOfFixedBugs),
                 Integer.toString(this.authors.size()),
                 Integer.toString(this.churn),
                 Integer.toString(this.maxChurn),
@@ -304,4 +272,6 @@ public class DatasetInstance {
                 isBuggy
         };
     }
+
+
 }

@@ -22,7 +22,6 @@ import org.json.simple.parser.JSONParser;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -41,7 +40,7 @@ public class Main {
 
             GitCommitFactory factory = GitCommitFactory.getInstance();
             for (RevCommit commit : results) {
-                if(! revCommits.contains(commit)) {
+                if (!revCommits.contains(commit)) {
                     // avoid duplicates (commits that refer more than 1 Jira ticket)
                     // it's maintained only the reference to a single Jira ticket for simplicity
                     revCommits.add(commit);
@@ -62,6 +61,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
+        String log;
         InputStream resource = Main.class.getClassLoader().getResourceAsStream("config.json");
         String projectName;
         if (resource != null) {
@@ -86,23 +86,29 @@ public class Main {
         VersionManager versionManager = new VersionManager(projectName, logger);
         versionManager.setReleases();
         Date maxDate = versionManager.getLatestReleaseDate();
-        logger.info(String.format("Retrieved releases: %d\tLatest release date: %s", versionManager.getReleasesSize(), maxDate.toString()));
+
+        log = String.format("Retrieved releases: %d\tLatest release date: %s", versionManager.getReleasesSize(), maxDate.toString());
+        logger.info(log);
         /*
          * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
          * */
         ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(projectName);
-        logger.info(String.format("Jira tickets: %d", tickets.size()));
+        log = String.format("Jira tickets: %d", tickets.size());
+        logger.info(log);
 
         /*---------------------------------------------------------------------GIT-------------------------------------------------------------*/
         /*
          * Now, for each ticket, let see in which Git commit is present
          * */
 
-        logger.info("\nRetrieving commits from Git ...");
+        logger.info("%nRetrieving commits from Git ...");
         List<GitCommit> fixCommits = retrieveCommitsWithJiraTickets(tickets, maxDate);
         List<RevCommit> allCommits = new GitAnalyzer().getDatetimeSortedGitLog(GitSingleton.getInstance().getGit(), maxDate);
-        logger.info(String.format("Total commits: %d", allCommits.size()));
-        logger.info(String.format("Fix commits: %d", fixCommits.size()));
+
+        log = String.format("Total commits: %d", allCommits.size());
+        logger.info(log);
+        log = String.format("Fix commits: %d", fixCommits.size());
+        logger.info(log);
 
         /*---------------------------------------------------------------------BUGS----------------------------------------------------------*/
 
@@ -126,10 +132,10 @@ public class Main {
         BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
-        logger.info("\nIdentification of FV, OV, AVs and IV for bugs. DONE");
+        logger.info("%nIdentification of FV, OV, AVs and IV for bugs. DONE");
 
         Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
-        logger.info("\nSplit commits by releases. DONE");
+        logger.info("%nSplit commits by releases. DONE");
 
         /*-----------------------------------------------GIT FILES------------------------------------------------------*/
 
@@ -140,29 +146,37 @@ public class Main {
         GitManager gitManager = new GitManager(GitSingleton.getInstance().getGit());
         DatasetCreator datasetCreator = new DatasetCreator(versionManager, gitManager, bugs, logger);
 
-        logger.info("\nDataset creation begins ...\n");
+        logger.info("%nDataset creation begins ...%n");
         List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease);
 
         int numBuggy = 0;
         List<String[]> newSet = new ArrayList<>();
         int numDuplicates = 0;
-        for(DatasetInstance instance : dataset){
+        for (DatasetInstance instance : dataset) {
             //check for duplicates
             String[] newEntry = new String[]{instance.getVersion(), instance.getFilename()};
-            if(! newSet.contains(newEntry))
+            if (!newSet.contains(newEntry))
                 newSet.add(new String[]{instance.getVersion(), instance.getFilename()});
             else {
                 numDuplicates++;
             }
             // get number of buggy instances
-            if(instance.isBuggy()){
+            if (instance.isBuggy()) {
                 numBuggy++;
             }
         }
-        logger.info(String.format("\nDataset size: %d instances", dataset.size()));
-        logger.info(String.format("Buggy instances: %d", numBuggy));
-        logger.info(String.format("Buggy percentage: %f %%", ((float)numBuggy/ dataset.size())*100.0));
-        logger.info(String.format("Number of duplicated instances: %d", numDuplicates));
+
+        log = String.format("%nDataset size: %d instances", dataset.size());
+        logger.info(log);
+        log = String.format("Buggy instances: %d", numBuggy);
+        logger.info(log);
+        log = String.format("Buggy percentage: %f %%", ((float) numBuggy / dataset.size()) * 100.0);
+        logger.info(log);
+        log = String.format("Number of duplicated instances: %d", numDuplicates);
+        logger.info(log);
+
+
+        // Building the CSV file
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
         arrayOfCSVEntry.add(new String[]{
@@ -174,7 +188,6 @@ public class Main {
                 "Max LOC added",
                 "Avg LOC added",
                 "Number of revisions",
-                "Number of fixed bugs",
                 "Number of authors",
                 "Churn",
                 "Max churn",

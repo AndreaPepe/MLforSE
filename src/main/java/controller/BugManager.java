@@ -68,7 +68,12 @@ public class BugManager {
             }
         }
 
-        for (Bug bug : bugsToBeRemoved)
+        removeBugs(bugs, bugsToBeRemoved);
+    }
+
+    private static void removeBugs(List<Bug> bugs, List<Bug> toRemove){
+        for(Bug bug: toRemove){
             bugs.remove(bug);
+        }
     }
 }

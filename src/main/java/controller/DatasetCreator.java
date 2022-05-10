@@ -44,6 +44,7 @@ public class DatasetCreator {
         gitManager.setDiffFormatter(); // prepare the diff formatter to filter only java files, excluding tests
         dataset = new ArrayList<>();
         RevCommit prev = null;
+        int indexOfCurrentRelease = 0;
         for (Map.Entry<String, List<RevCommit>> release : gitLog.entrySet()) {
             // for each release
             logger.info(String.format("Release: %s\tCommits: %d", release.getKey(), release.getValue().size()));
@@ -60,21 +61,24 @@ public class DatasetCreator {
              Deletion, modification and so on will count on this!
              */
             String nextRelease = versionManager.findNextVersion(release.getKey());
+            // the size is kept before adding the files of the next release
+            int newValueForIndex = dataset.size();
             if (nextRelease != null) {
                 // only if the current release is not the last one
-                List<DatasetInstance> instancesAtTheEndOfTheRelease = new ArrayList<>();
 
-                for (DatasetInstance instance : dataset) {
-                    if (instance.getVersion().equals(release.getKey())) {
-                        instancesAtTheEndOfTheRelease.add(new DatasetInstance(instance, nextRelease));
-                        // compute age for the instances of the current release
-                        computeAge(instance, release.getKey());
-                    }
+                List<DatasetInstance> nextReleaseInstances = new ArrayList<>();
+                for (int i = indexOfCurrentRelease; i < dataset.size(); i++){
+                    // each file present at the end of the current release is initially present also in the next release
+                    nextReleaseInstances.add(new DatasetInstance(dataset.get(i), nextRelease));
+                    // compute age at the end of each release for each instance in that release
+                    computeAge(dataset.get(i), release.getKey());
                 }
 
-                dataset.addAll(instancesAtTheEndOfTheRelease);
+                dataset.addAll(nextReleaseInstances);
             }
 
+            // increment the index to the first entry of the next release
+            indexOfCurrentRelease = newValueForIndex;
         }
 
         // cut the dataset to the first half of releases
@@ -173,13 +177,6 @@ public class DatasetCreator {
                 if (idx >= 0)
                     this.dataset.get(idx).setBuggy(true);
             }
-        }
-
-        //TODO: for now set all bugs, but in the future let's filter only bugs that really affected the instance
-
-        // add fixed bugs
-        for (Bug bug : bugs) {
-            instance.addFixedBug(bug.getTicket().getKey());
         }
 
         //increment number of revisions
@@ -287,15 +284,17 @@ public class DatasetCreator {
             List<Edit> edits = df.toFileHeader(diff).toEditList();
             for (Edit edit : edits) {
                 switch (edit.getType()) {
-                    case INSERT -> {// new LOC have been inserted
+                    case INSERT:// new LOC have been inserted
                         currentAdd = edit.getLengthB() - edit.getLengthA();
                         linesAdded += currentAdd;
-                    }
-                    case DELETE -> { // LOC have been deleted
+                        break;
+
+                    case DELETE: // LOC have been deleted
                         currentDelete =  edit.getLengthA() - edit.getLengthB();
                         linesDeleted += currentDelete;
-                    }
-                    case REPLACE -> {
+                        break;
+
+                    case REPLACE:
                         //LOCs have been modified
                         if (edit.getLengthA() < edit.getLengthB()) {
                             // the new version is bigger; so we have added lines
@@ -306,8 +305,11 @@ public class DatasetCreator {
                             currentDelete = edit.getLengthA() - edit.getLengthB();
                             linesDeleted += currentDelete;
                         }
-                    }
-                    default -> {}
+                        break;
+
+                    default:
+                        // do nothing
+                        break;
                 }
             }
         } catch (IOException e) {
