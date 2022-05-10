@@ -1,9 +1,10 @@
 package logging;
 
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.logging.*;
+
+import static java.lang.System.exit;
 
 public class LoggerSingleton {
 
@@ -22,17 +23,14 @@ public class LoggerSingleton {
 
     public synchronized  Logger getLogger(){
         if (logger == null){
-            logger = Logger.getLogger(LoggerSingleton.class.getName());
-            for(Handler iHandler:logger.getParent().getHandlers())
-            {
-                logger.getParent().removeHandler(iHandler);
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream("logging.properties");
+            try {
+                LogManager.getLogManager().readConfiguration(inputStream);
+                logger = Logger.getLogger("Logger");
+            } catch (IOException e) {
+                // Logger does not work
+                exit(-20);
             }
-
-            CustomRecordFormatter formatter = new CustomRecordFormatter();
-            ConsoleHandler consoleHandler = new ConsoleHandler();
-            consoleHandler.setFormatter(formatter);
-            logger.setLevel(Level.FINEST);
-            logger.addHandler(consoleHandler);
         }
         return logger;
     }
