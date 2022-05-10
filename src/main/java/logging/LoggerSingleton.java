@@ -2,6 +2,7 @@ package logging;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class LoggerSingleton {
@@ -30,6 +31,7 @@ public class LoggerSingleton {
             CustomRecordFormatter formatter = new CustomRecordFormatter();
             ConsoleHandler consoleHandler = new ConsoleHandler();
             consoleHandler.setFormatter(formatter);
+            logger.setLevel(Level.FINEST);
             logger.addHandler(consoleHandler);
         }
         return logger;

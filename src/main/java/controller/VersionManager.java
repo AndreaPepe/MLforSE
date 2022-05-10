@@ -188,8 +188,10 @@ public class VersionManager {
         for (Bug bug : bugWithNoRelease) {
             bugs.remove(bug);
         }
-        logger.info(String.format("\nNumber of bug in which proportion has been used: %d", numberOfProportion));
-        logger.info(String.format("Proportion p: %f", this.proportion));
+        String log = String.format("\nNumber of bug in which proportion has been used: %d", numberOfProportion);
+        logger.info(log);
+        log = String.format("Proportion p: %f", this.proportion);
+        logger.info(log);
         return bugs;
     }
 

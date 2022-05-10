@@ -101,7 +101,7 @@ public class Main {
          * Now, for each ticket, let see in which Git commit is present
          * */
 
-        logger.info("%nRetrieving commits from Git ...");
+        logger.info("\nRetrieving commits from Git ...");
         List<GitCommit> fixCommits = retrieveCommitsWithJiraTickets(tickets, maxDate);
         List<RevCommit> allCommits = new GitAnalyzer().getDatetimeSortedGitLog(GitSingleton.getInstance().getGit(), maxDate);
 
@@ -132,10 +132,10 @@ public class Main {
         BugManager.patchFixCommit(bugs);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
-        logger.info("%nIdentification of FV, OV, AVs and IV for bugs. DONE");
+        logger.info("\nIdentification of FV, OV, AVs and IV for bugs. DONE");
 
         Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
-        logger.info("%nSplit commits by releases. DONE");
+        logger.info("\nSplit commits by releases. DONE");
 
         /*-----------------------------------------------GIT FILES------------------------------------------------------*/
 
@@ -146,7 +146,7 @@ public class Main {
         GitManager gitManager = new GitManager(GitSingleton.getInstance().getGit());
         DatasetCreator datasetCreator = new DatasetCreator(versionManager, gitManager, bugs, logger);
 
-        logger.info("%nDataset creation begins ...%n");
+        logger.info("\nDataset creation begins ...\n");
         List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease);
 
         int numBuggy = 0;
@@ -166,7 +166,7 @@ public class Main {
             }
         }
 
-        log = String.format("%nDataset size: %d instances", dataset.size());
+        log = String.format("\nDataset size: %d instances", dataset.size());
         logger.info(log);
         log = String.format("Buggy instances: %d", numBuggy);
         logger.info(log);

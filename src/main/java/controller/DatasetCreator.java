@@ -45,9 +45,11 @@ public class DatasetCreator {
         dataset = new ArrayList<>();
         RevCommit prev = null;
         int indexOfCurrentRelease = 0;
+        String log;
         for (Map.Entry<String, List<RevCommit>> release : gitLog.entrySet()) {
             // for each release
-            logger.info(String.format("Release: %s\tCommits: %d", release.getKey(), release.getValue().size()));
+            log = String.format("Release: %s\tCommits: %d", release.getKey(), release.getValue().size());
+            logger.info(log);
             for (RevCommit current : release.getValue()) {
                 // for each commit
                 analyzeCommitPair(release.getKey(), prev, current);
