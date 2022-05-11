@@ -240,7 +240,24 @@ public class DatasetInstance {
         this.fixedBugs.add(bugTicket);
     }
 
+    public float getWeightedAge(){
+        return (float)this.age/this.locTouched;
+    }
 
+    public int getNumberOfAuthors(){
+        return this.authors.size();
+    }
+
+    public int getNumberOfFixedBugs(){
+        return this.fixedBugs.size();
+    }
+
+    public String isBuggyYesOrNot(){
+        if (this.buggy)
+            return "yes";
+        else
+            return  "no";
+    }
     /**
      * This method transforms the DatasetInstance class in an array of Strings,
      * representing an instance in a CSV file dataset.
@@ -265,12 +282,6 @@ public class DatasetInstance {
      * @return Array of strings to be inserted in a CSV file
      */
     public String[] toStringArray() {
-        String isBuggy;
-        if (this.buggy)
-            isBuggy = "yes";
-        else
-            isBuggy = "no";
-
 
         return new String[]{
                 this.version,
@@ -281,14 +292,14 @@ public class DatasetInstance {
                 Integer.toString(this.maxLocAdded),
                 String.format("%f", this.avgLocAdded),
                 Integer.toString(this.numberOfRevisions),
-                Integer.toString(this.authors.size()),
+                Integer.toString(this.getNumberOfAuthors()),
                 Integer.toString(this.churn),
                 Integer.toString(this.maxChurn),
                 String.format("%f", this.avgChurn),
-                Integer.toString(this.fixedBugs.size()),
+                Integer.toString(this.getNumberOfFixedBugs()),
                 Integer.toString(this.age),
-                String.format("%f", (float)this.age/this.locTouched),
-                isBuggy
+                String.format("%f", this.getWeightedAge()),
+                this.isBuggyYesOrNot()
         };
     }
 

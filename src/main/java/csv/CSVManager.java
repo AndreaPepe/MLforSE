@@ -20,13 +20,12 @@ public class CSVManager {
             If the file already exists, delete it; create the file and write it.
             */
         File file = new File(filename);
-        if (!Files.deleteIfExists(file.toPath())) {
-            throw new CSVException("Unable to delete file");
-        }
+        Files.deleteIfExists(file.toPath());
         FileWriter writer = new FileWriter(file);
         // we need to put ';' as delimiter
         CSVWriter csvWriter = new CSVWriter(writer, ';', '"', '\\', "\n");
         csvWriter.writeAll(lines);
         csvWriter.close();
+        writer.close();
     }
 }

@@ -1,9 +1,13 @@
 package main;
+/*
+ * To run the following script use this JVM command line configuration
+ * in order to avoid Weka exceptions in the log:
+ *
+ * java --add-opens java.base/java.lang=ALL-UNNAMED
+ *
+ */
 
-import controller.BugManager;
-import controller.DatasetCreator;
-import controller.GitManager;
-import controller.VersionManager;
+import controller.*;
 import csv.CSVManager;
 import git.GitAnalyzer;
 import git.GitCommitFactory;
@@ -18,6 +22,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import weka.ClassifierEvaluation;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -186,7 +191,7 @@ public class Main {
         // Building the CSV file
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
-        arrayOfCSVEntry.add(new String[]{
+        String[] csvHeader = new String[]{
                 "Release",
                 "Filename",
                 "Size",
@@ -202,13 +207,45 @@ public class Main {
                 "NFix",
                 "Age",
                 "WeightedAge",
-                "Buggy"});
+                "Buggy"};
+
+        arrayOfCSVEntry.add(csvHeader);
 
         for (DatasetInstance entry : dataset) {
             arrayOfCSVEntry.add(entry.toStringArray());
         }
 
         CSVManager.csvWriteAll(projectName.toLowerCase(Locale.ROOT) + "_dataset.csv", arrayOfCSVEntry);
+
+
+        /*--------------------------------------------------------------WEKA-----------------------------------------------------------*/
+
+        // throw away the first 2 columns (release and filename)
+        String[] wekaHeader = Arrays.copyOfRange(csvHeader, 2, csvHeader.length);
+        WekaController wekaController = new WekaController(projectName, dataset, wekaHeader);
+
+        /*
+        TODO: maintain a list of different datasets in order to apply Walk Forward using training set with Snoring
+        HINT: during the creation of the actual dataset, at the end of each release save the current state of the
+        dataset and that is the dataset Snoring-affected at the i-th release.
+         */
+        List<ClassifierEvaluation> evaluations = wekaController.walkForward();
+        List<String[]> evaluationsToCsv = new ArrayList<>();
+        String[] header = new String[] {
+                "Dataset",
+                "#TrainingRelease",
+                "Classifier",
+                "Precision",
+                "Recall",
+                "AUC",
+                "Kappa"
+        };
+        evaluationsToCsv.add(header);
+        for (ClassifierEvaluation ce : evaluations){
+            evaluationsToCsv.add(ce.toStringArray(projectName));
+        }
+
+        CSVManager.csvWriteAll(projectName + "_classifier_evaluation.csv", evaluationsToCsv);
     }
 
 
