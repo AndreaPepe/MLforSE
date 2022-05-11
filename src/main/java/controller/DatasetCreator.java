@@ -23,7 +23,7 @@ public class DatasetCreator {
     private final Logger logger;
 
     private List<DatasetInstance> dataset;
-
+    private int indexOfCurrentRelease = 0;
 
     public DatasetCreator(VersionManager versionManager, GitManager gitManager, List<Bug> bugs, Logger logger) {
         this.versionManager = versionManager;
@@ -44,7 +44,7 @@ public class DatasetCreator {
         gitManager.setDiffFormatter(); // prepare the diff formatter to filter only java files, excluding tests
         dataset = new ArrayList<>();
         RevCommit prev = null;
-        int indexOfCurrentRelease = 0;
+
         String log;
         for (Map.Entry<String, List<RevCommit>> release : gitLog.entrySet()) {
             // for each release
@@ -109,7 +109,18 @@ public class DatasetCreator {
         instance.addAuthor(author.getName());
         // number of Revisions does not need to be incremented because it's already initialized to 1
         computeLocChanges(entry, instance);
-        dataset.add(instance);
+        List<DatasetInstance> currentRelease = dataset.subList(this.indexOfCurrentRelease, this.dataset.size());
+        boolean notPresent = true;
+        for (DatasetInstance i : currentRelease){
+            if (i.getFilename().equals(entry.getNewPath())){
+                notPresent = false;
+                break;
+            }
+        }
+        if (notPresent)
+            dataset.add(instance);
+        //else if (dataset.get(idx).getVersion().equals(release))
+            //logger.info("Instance already present in dataset: [" + dataset.get(idx).getFilename() + ", " + release);
     }
 
     private void handleCopy(DiffEntry entry, String release, RevCommit commit) {
@@ -121,14 +132,14 @@ public class DatasetCreator {
         int idx = getLatestInstanceByName(oldName);
         if (idx < 0)
             return;
+        dataset.get(idx).incrementNumberOfRevisions();
+        dataset.get(idx).addAuthor(author.getName());
+        if(oldName.equals(newName))
+            return;
         DatasetInstance newInstance = new DatasetInstance(dataset.get(idx), release);
         newInstance.setFilename(newName);
 
-        // increment the number of revisions of both instances
-        dataset.get(idx).incrementNumberOfRevisions();
-        newInstance.incrementNumberOfRevisions();
         // add the author for both instances
-        dataset.get(idx).addAuthor(author.getName());
         newInstance.addAuthor(author.getName());
         dataset.add(newInstance);
     }
@@ -146,19 +157,12 @@ public class DatasetCreator {
 
     private void handleModify(DiffEntry entry, String release, RevCommit commit) {
         int indexLatest = getLatestInstanceByName(entry.getNewPath());
-        if (indexLatest < 0) {
-            // file does not exist
+        if (indexLatest < 0 || !this.dataset.get(indexLatest).getVersion().equals(release)) {
+            // file does not exist or is not in this release (it has been deleted)
             return;
         }
         //old instance
         DatasetInstance instance = this.dataset.get(indexLatest);
-        boolean sameRelease = instance.getVersion().equals(release);
-        if (!sameRelease) {
-            // create a new instance from the previous one, maintaining stats
-            instance = new DatasetInstance(instance, release);
-            instance.setBuggy(false);
-            this.dataset.add(instance);
-        }
 
         // Get bugs in order to detect if the instance is BUGGY
         List<Bug> commitBugs = getBugsOfCommit(this.bugs, commit);
@@ -170,7 +174,7 @@ public class DatasetCreator {
         int idx;
         // Set buggy true
         for (String av : affectedVersions) {
-            idx = getLatestInstanceByNameAndRelease(entry.getNewPath(), av);
+            idx = getLatestInstanceByNameAndRelease(instance.getFilename(), av);
             if (idx >= 0)
                 this.dataset.get(idx).setBuggy(true);
             // Check also for previous names of the file (handled with RENAME commits)
@@ -181,12 +185,17 @@ public class DatasetCreator {
             }
         }
 
+        // update the set of fixed bugs of the instance, but only in the current release
+        for (Bug fixedBug : commitBugs){
+            instance.addFixedBug(fixedBug.getTicket().getKey());
+        }
+
         //increment number of revisions
         // it's important to do it before loc changes computation
-        instance.incrementNumberOfRevisions();
-        computeLocChanges(entry, instance);
+        dataset.get(indexLatest).incrementNumberOfRevisions();
+        computeLocChanges(entry, dataset.get(indexLatest));
         // add author
-        instance.addAuthor(commit.getAuthorIdent().getName());
+        dataset.get(indexLatest).addAuthor(commit.getAuthorIdent().getName());
     }
 
     private void handleRename(DiffEntry entry, String release, RevCommit commit) {
@@ -194,6 +203,17 @@ public class DatasetCreator {
         int idx = getLatestInstanceByName(entry.getOldPath());
         if (idx < 0)
             return;
+
+        if (entry.getOldPath().equals(entry.getNewPath())){
+            // consistency check
+            return;
+        }
+        // renaming is only with the already inserted files of the CURRENT RELEASE
+        dataset.get(idx).addPreviousName(entry.getOldPath());
+        dataset.get(idx).setFilename(entry.getNewPath());
+        dataset.get(idx).incrementNumberOfRevisions();
+        dataset.get(idx).addAuthor(author.getName());
+        /*
         if (dataset.get(idx).getVersion().equals(release)) {
             // if in the same release, change only the name
             dataset.get(idx).addPreviousName(entry.getOldPath());
@@ -213,7 +233,7 @@ public class DatasetCreator {
             newInstance.incrementNumberOfRevisions();
             dataset.add(newInstance);
         }
-
+*/
 
         //TODO: check if there is need to calculate stats
     }

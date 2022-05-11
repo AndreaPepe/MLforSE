@@ -237,7 +237,7 @@ public class VersionManager {
         String openVer = bug.getOpeningVersion();
         int indexFix = findIndexOfVersion(fixVer);
         int indexOpening = findIndexOfVersion(openVer);
-        int indexInjected = (int) Math.floor(indexFix - this.proportion * (indexFix - indexOpening));
+        int indexInjected = Math.round(indexFix - this.proportion * (indexFix - indexOpening));
         // predicted IV = FV - (FV - OV) * p
         if (indexInjected < 0)
             indexInjected = 0;

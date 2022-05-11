@@ -148,18 +148,25 @@ public class Main {
 
         logger.info("\nDataset creation begins ...\n");
         List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease);
+        logger.info("\nDataset creation. DONE");
 
         int numBuggy = 0;
         List<String[]> newSet = new ArrayList<>();
+        List<String[]> toAdd = new ArrayList<>();
         int numDuplicates = 0;
         for (DatasetInstance instance : dataset) {
             //check for duplicates
             String[] newEntry = new String[]{instance.getVersion(), instance.getFilename()};
-            if (!newSet.contains(newEntry))
-                newSet.add(new String[]{instance.getVersion(), instance.getFilename()});
-            else {
-                numDuplicates++;
+            for (String[] arrayEntry : newSet) {
+                if (arrayEntry[0].equals(newEntry[0]) && arrayEntry[1].equals(newEntry[1])) {
+                    numDuplicates++;
+                } else {
+                    toAdd.add(new String[]{instance.getVersion(), instance.getFilename()});
+                }
             }
+            newSet.addAll(toAdd);
+            toAdd = new ArrayList<>();
+
             // get number of buggy instances
             if (instance.isBuggy()) {
                 numBuggy++;
@@ -183,16 +190,18 @@ public class Main {
                 "Release",
                 "Filename",
                 "Size",
-                "LOC touched",
-                "LOC added",
-                "Max LOC added",
-                "Avg LOC added",
-                "Number of revisions",
-                "Number of authors",
+                "LOC_touched",
+                "LOC_added",
+                "MAX_LOC_added",
+                "AVG_LOC_added",
+                "NR",
+                "NAuth",
                 "Churn",
-                "Max churn",
-                "Avg churn",
+                "MAX_Churn",
+                "AVG_Churn",
+                "NFix",
                 "Age",
+                "WeightedAge",
                 "Buggy"});
 
         for (DatasetInstance entry : dataset) {

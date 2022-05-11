@@ -23,6 +23,7 @@ public class DatasetInstance {
     private int churn;                          // sum of (added - deleted) LOC over revisions
     private int maxChurn;                       // maximum number of churn in a revision
     private float avgChurn;                     // average number of churn over revisions
+    private Set<String> fixedBugs;              // set of fixed bugs, used to calculate the number of fixed bugs
     private int age;                            // age of the file in weeks
 
     public DatasetInstance(String version, String filename, LocalDate creationDate, boolean buggy) {
@@ -43,6 +44,7 @@ public class DatasetInstance {
         this.maxChurn = 0;
         this.avgChurn = 0f;
         this.age = 0;
+        this.fixedBugs = new HashSet<>();
         this.buggy = buggy;
     }
 
@@ -66,6 +68,7 @@ public class DatasetInstance {
         this.maxChurn = old.getMaxChurn();
         this.avgChurn = old.getAvgChurn();
         this.age = old.getAge();
+        this.fixedBugs = old.getFixedBugs();
         this.buggy = old.isBuggy();
     }
 
@@ -193,6 +196,14 @@ public class DatasetInstance {
         this.avgChurn = avgChurn;
     }
 
+    public Set<String> getFixedBugs() {
+        return fixedBugs;
+    }
+
+    public void setFixedBugs(Set<String> fixedBugs) {
+        this.fixedBugs = fixedBugs;
+    }
+
     public int getAge() {
         return age;
     }
@@ -225,6 +236,10 @@ public class DatasetInstance {
         this.avgLocAdded = (float) this.locAdded / this.numberOfRevisions;
     }
 
+    public void addFixedBug(String bugTicket){
+        this.fixedBugs.add(bugTicket);
+    }
+
 
     /**
      * This method transforms the DatasetInstance class in an array of Strings,
@@ -242,7 +257,9 @@ public class DatasetInstance {
      * - churn
      * - max churn
      * - avg churn
+     * - number of fixed bugs
      * - age
+     * - weighted age
      * - buggy {yes, no}
      *
      * @return Array of strings to be inserted in a CSV file
@@ -268,7 +285,9 @@ public class DatasetInstance {
                 Integer.toString(this.churn),
                 Integer.toString(this.maxChurn),
                 String.format("%f", this.avgChurn),
+                Integer.toString(this.fixedBugs.size()),
                 Integer.toString(this.age),
+                String.format("%f", (float)this.age/this.locTouched),
                 isBuggy
         };
     }
