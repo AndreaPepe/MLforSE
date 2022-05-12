@@ -23,12 +23,67 @@ public class WekaController {
     private final int numReleases;
     private final List<String> releases;
 
+    private final Map<String, List<DatasetInstance>> datasetsWithSnoring;
+
     public WekaController(String projectName, List<DatasetInstance> dataset, String[] datasetHeader) {
         this.projectName = projectName;
         this.datasetPerRelease = divideDatasetPerRelease(dataset);
         this.datasetHeader = datasetHeader;
         this.numReleases = datasetPerRelease.keySet().size();
         this.releases = new ArrayList<>(datasetPerRelease.keySet());
+
+
+        this.datasetsWithSnoring = null;
+    }
+
+    public WekaController(String projectName, Map<String, List<DatasetInstance>> datasetsWithSnoring, String[] datasetHeader) {
+        this.projectName = projectName;
+        this.datasetsWithSnoring = datasetsWithSnoring;
+        this.datasetHeader = datasetHeader;
+        this.numReleases = datasetsWithSnoring.size();
+        this.releases = new ArrayList<>(datasetsWithSnoring.keySet());
+
+        // the last dataset is the one from which select testing sets
+        this.datasetPerRelease = divideDatasetPerRelease(datasetsWithSnoring.get(releases.get(releases.size() - 1)));
+    }
+
+    public List<ClassifierEvaluation> walkForwardWithSnoring() {
+        List<ClassifierEvaluation> evaluations = new ArrayList<>();
+        List<DatasetInstance> trainingSet;
+        List<DatasetInstance> testingSet;
+        int trainingSetSize;
+        String relationName;
+        List<ClassifierEvaluation> evaluationToBeAdded;
+
+        WekaClassifierEvaluator evaluator = new WekaClassifierEvaluator();
+
+        for (int i = 1; i < numReleases - 1; i++) {
+            trainingSetSize = i;
+            String currentReleaseForTraining = releases.get(i - 1);
+            trainingSet = this.datasetsWithSnoring.get(currentReleaseForTraining);
+            testingSet = this.datasetPerRelease.get(releases.get(i));
+            evaluationToBeAdded = new ArrayList<>();
+            // generate arff files for training and testing
+            try {
+                relationName = this.projectName + "_training";
+                ArffGenerator.generateArffFromDataset(datasetHeader, trainingSet, relationName, TRAINING_OUTPUT);
+
+                relationName = this.projectName + "_testing";
+                ArffGenerator.generateArffFromDataset(datasetHeader, testingSet, relationName, TESTING_OUTPUT);
+                evaluationToBeAdded.addAll(evaluator.evaluateClassifiers(TRAINING_OUTPUT, TESTING_OUTPUT));
+                for (ClassifierEvaluation ce : evaluationToBeAdded) {
+                    ce.setTrainingSetSize(trainingSetSize);
+                }
+                evaluations.addAll(evaluationToBeAdded);
+            } catch (IOException e) {
+                LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error generating arff files");
+            } catch (Exception e) {
+                LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error evaluating classifiers");
+                e.printStackTrace();
+            }
+        }
+
+        return evaluations;
     }
 
     /**

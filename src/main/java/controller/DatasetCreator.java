@@ -25,6 +25,13 @@ public class DatasetCreator {
     private List<DatasetInstance> dataset;
     private int indexOfCurrentRelease = 0;
 
+    //TODO
+    private Map<String, List<DatasetInstance>> datasetsWithSnoring;
+
+    public Map<String, List<DatasetInstance>> getMultipleDatasets() {
+        return this.datasetsWithSnoring;
+    }
+
     public DatasetCreator(VersionManager versionManager, GitManager gitManager, List<Bug> bugs, Logger logger) {
         this.versionManager = versionManager;
         this.gitManager = gitManager;
@@ -43,10 +50,16 @@ public class DatasetCreator {
     public List<DatasetInstance> computeDataset(Map<String, List<RevCommit>> gitLog) throws IOException {
         gitManager.setDiffFormatter(); // prepare the diff formatter to filter only java files, excluding tests
         dataset = new ArrayList<>();
+
+        //TODO: here
+        datasetsWithSnoring = new LinkedHashMap<>();
+
         RevCommit prev = null;
 
         String log;
         for (Map.Entry<String, List<RevCommit>> release : gitLog.entrySet()) {
+
+
             // for each release
             log = String.format("Release: %s\tCommits: %d", release.getKey(), release.getValue().size());
             logger.info(log);
@@ -57,6 +70,13 @@ public class DatasetCreator {
                 prev = current;
             }
 
+            /*
+            TODO:
+            At the end of each release, clone the actual state of the dataset in the list to have the training set for Walk Forward
+             */
+            if (versionManager.getHalfVersions().containsKey(release.getKey())) {
+                datasetsWithSnoring.put(release.getKey(), cloneCurrentStateOfDataset());
+            }
 
             /* At the end of each release (except the last one), copy each file present in the dataset
              as a file present in the next release.
@@ -69,7 +89,7 @@ public class DatasetCreator {
                 // only if the current release is not the last one
 
                 List<DatasetInstance> nextReleaseInstances = new ArrayList<>();
-                for (int i = indexOfCurrentRelease; i < dataset.size(); i++){
+                for (int i = indexOfCurrentRelease; i < dataset.size(); i++) {
                     // each file present at the end of the current release is initially present also in the next release
                     nextReleaseInstances.add(new DatasetInstance(dataset.get(i), nextRelease));
                     // compute age at the end of each release for each instance in that release
@@ -111,8 +131,8 @@ public class DatasetCreator {
         computeLocChanges(entry, instance);
         List<DatasetInstance> currentRelease = dataset.subList(this.indexOfCurrentRelease, this.dataset.size());
         boolean notPresent = true;
-        for (DatasetInstance i : currentRelease){
-            if (i.getFilename().equals(entry.getNewPath())){
+        for (DatasetInstance i : currentRelease) {
+            if (i.getFilename().equals(entry.getNewPath())) {
                 notPresent = false;
                 break;
             }
@@ -132,7 +152,7 @@ public class DatasetCreator {
             return;
         dataset.get(idx).incrementNumberOfRevisions();
         dataset.get(idx).addAuthor(author.getName());
-        if(oldName.equals(newName))
+        if (oldName.equals(newName))
             return;
         DatasetInstance newInstance = new DatasetInstance(dataset.get(idx), release);
         newInstance.setFilename(newName);
@@ -184,7 +204,7 @@ public class DatasetCreator {
         }
 
         // update the set of fixed bugs of the instance, but only in the current release
-        for (Bug fixedBug : commitBugs){
+        for (Bug fixedBug : commitBugs) {
             instance.addFixedBug(fixedBug.getTicket().getKey());
         }
 
@@ -202,12 +222,12 @@ public class DatasetCreator {
         if (idx < 0)
             return;
 
-        if (entry.getOldPath().equals(entry.getNewPath())){
+        if (entry.getOldPath().equals(entry.getNewPath())) {
             // consistency check
             return;
         }
 
-        if (!dataset.get(idx).getVersion().equals(release)){
+        if (!dataset.get(idx).getVersion().equals(release)) {
             // if the file is not present in the current release , we have nothing to rename
             return;
         }
@@ -275,6 +295,17 @@ public class DatasetCreator {
     }
 
 
+    private List<DatasetInstance> cloneCurrentStateOfDataset() {
+        List<DatasetInstance> ret = new ArrayList<>();
+        for (DatasetInstance instance : this.dataset) {
+            // create a new instance to make a copy by value and not by reference, so
+            // the newly created instance will not be affected by changes in the original one
+            ret.add(new DatasetInstance(instance, instance.getVersion()));
+        }
+        return ret;
+    }
+
+
     /* -------------------------------------------------------------------------- FEATURES COMPUTATION ----------------------------------------------------------------*/
 
     private void computeLocChanges(DiffEntry diff, DatasetInstance instance) {
@@ -294,7 +325,7 @@ public class DatasetCreator {
                         break;
 
                     case DELETE: // LOC have been deleted
-                        currentDelete =  edit.getLengthA() - edit.getLengthB();
+                        currentDelete = edit.getLengthA() - edit.getLengthB();
                         linesDeleted += currentDelete;
                         break;
 

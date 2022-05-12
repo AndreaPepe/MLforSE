@@ -136,23 +136,24 @@ public class Main {
 
         BugManager.patchFixCommit(bugs);
 
+        // sort bugs by time to avoid influence of future bugs on past data
+        // this allows to build training datasets Snoring-affected to be used in Wal Forward approach to validate the predictor
+        BugManager.sortBugsChronologically(bugs);
+
         bugs = versionManager.calculateVersionsForBugs(bugs);
         logger.info("\nIdentification of FV, OV, AVs and IV for bugs. DONE");
 
         Map<String, List<RevCommit>> commitPerRelease = versionManager.splitCommitsPerRelease(allCommits);
         logger.info("\nSplit commits by releases. DONE");
 
-        /*-----------------------------------------------GIT FILES------------------------------------------------------*/
-
-        /*
-        git diff --stat -M --name-status <commitID>
-        */
+        /*-----------------------------------------------DATASET CREATION------------------------------------------------------*/
 
         GitManager gitManager = new GitManager(GitSingleton.getInstance().getGit());
         DatasetCreator datasetCreator = new DatasetCreator(versionManager, gitManager, bugs, logger);
 
         logger.info("\nDataset creation begins ...\n");
         List<DatasetInstance> dataset = datasetCreator.computeDataset(commitPerRelease);
+        Map<String, List<DatasetInstance>> datasetsWithSnoring = datasetCreator.getMultipleDatasets();
         logger.info("\nDataset creation. DONE");
 
         int numBuggy = 0;
@@ -223,8 +224,9 @@ public class Main {
 
         // throw away the first 2 columns (release and filename)
         String[] wekaHeader = Arrays.copyOfRange(csvHeader, 2, csvHeader.length);
-        WekaController wekaController = new WekaController(projectName, dataset, wekaHeader);
-
+        //TODO
+        //WekaController wekaController = new WekaController(projectName, dataset, wekaHeader);
+        WekaController wekaController = new WekaController(projectName, datasetsWithSnoring, wekaHeader);
         /*
         TODO: maintain a list of different datasets in order to apply Walk Forward using training set with Snoring
         HINT: during the creation of the actual dataset, at the end of each release save the current state of the
@@ -232,7 +234,9 @@ public class Main {
          */
         logger.info("Walk Forward technique to evaluate classifiers is running ...");
 
-        List<ClassifierEvaluation> evaluations = wekaController.walkForward();
+        //TODO:
+//        List<ClassifierEvaluation> evaluations = wekaController.walkForward();
+        List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring();
         List<String[]> evaluationsToCsv = new ArrayList<>();
         String[] header = new String[] {
                 "Dataset",

@@ -76,4 +76,13 @@ public class BugManager {
             bugs.remove(bug);
         }
     }
+
+    public static void sortBugsChronologically (List<Bug> bugs){
+        bugs.sort((bug1, bug2) -> {
+            LocalDate bug1Date = LocalDate.parse(bug1.getTicket().getCreationDate());
+            LocalDate bug2Date = LocalDate.parse(bug2.getTicket().getCreationDate());
+
+            return bug1Date.compareTo(bug2Date);
+        });
+    }
 }
