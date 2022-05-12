@@ -23,15 +23,16 @@ public class WekaClassifierEvaluator {
 
     public List<ClassifierEvaluation> evaluateClassifiers(String trainingSet, String testingSet) throws Exception {
         //load datasets
-        InputStream streamTraining = new FileInputStream(trainingSet);
-        InputStream streamTesting = new FileInputStream(testingSet);
-        ConverterUtils.DataSource sourceTraining = new ConverterUtils.DataSource(streamTraining);
-        Instances training = sourceTraining.getDataSet();
-        ConverterUtils.DataSource sourceTesting = new ConverterUtils.DataSource(streamTesting);
-        Instances testing = sourceTesting.getDataSet();
+        Instances training;
+        Instances testing;
+        try (InputStream streamTraining = new FileInputStream(trainingSet);
+             InputStream streamTesting = new FileInputStream(testingSet)) {
 
-        streamTraining.close();
-        streamTesting.close();
+            ConverterUtils.DataSource sourceTraining = new ConverterUtils.DataSource(streamTraining);
+            training = sourceTraining.getDataSet();
+            ConverterUtils.DataSource sourceTesting = new ConverterUtils.DataSource(streamTesting);
+            testing = sourceTesting.getDataSet();
+        }
 
         int numAttr = training.numAttributes();
         // setting the last attribute as the attribute to estimate
@@ -43,7 +44,7 @@ public class WekaClassifierEvaluator {
         for (ClassifierType classifierName : this.classifiers) {
             classifier = handleClassifier(classifierName);
 
-            if(classifier != null)
+            if (classifier != null)
                 classifier.buildClassifier(training);
 
             Evaluation eval = new Evaluation(testing);
@@ -59,34 +60,31 @@ public class WekaClassifierEvaluator {
                     eval.kappa()));
 
         }
-
-        streamTraining.close();
-        streamTesting.close();
         return classifierEvaluations;
     }
 
     private AbstractClassifier handleClassifier(ClassifierType classifierType) {
 
         switch (classifierType) {
-            case NAIVE_BAYES -> {
+            case NAIVE_BAYES:
                 return new NaiveBayes();
-            }
-            case J48 -> {
+
+            case J48:
                 return new J48();
-            }
-            case RANDOM_FOREST -> {
+
+            case RANDOM_FOREST:
                 return new RandomForest();
-            }
-            case IBK -> {
+
+            case IBK:
                 return new IBk();
-            }
-            case ZERO_R -> {
+
+            case ZERO_R:
                 return new ZeroR();
-            }
-            default -> {
+
+            default:
                 LoggerSingleton.getInstance().getLogger().info("Invalid classifier chosen");
                 return null;
-            }
+
         }
     }
 }

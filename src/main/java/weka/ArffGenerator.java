@@ -14,39 +14,38 @@ public class ArffGenerator {
             throws IOException {
         File file = new File(outputFilename);
         Files.deleteIfExists(file.toPath());
-        FileOutputStream fos = new FileOutputStream(file);
-        OutputStreamWriter osw = new OutputStreamWriter(fos);
-        BufferedWriter writer = new BufferedWriter(osw);
-        StringBuilder line = new StringBuilder();
+        try(FileOutputStream fos = new FileOutputStream(file);
+            OutputStreamWriter osw = new OutputStreamWriter(fos);
+            BufferedWriter writer = new BufferedWriter(osw)){
 
-        String newlineChar = System.getProperty("line.separator");
-        // writing header of arff file
-        line.append(String.format("@relation %s", relationName)).append(newlineChar);
-        writer.write(line.toString());
-        line.setLength(0);
-        // all attributes are numeric, except the last one which is binary
-        for (int i = 0; i < attributes.length - 1; i++) {
-            line.append(String.format("@attribute %s numeric", attributes[i])).append(newlineChar);
+            StringBuilder line = new StringBuilder();
+
+            String newlineChar = System.getProperty("line.separator");
+            // writing header of arff file
+            line.append(String.format("@relation %s", relationName)).append(newlineChar);
             writer.write(line.toString());
             line.setLength(0);
-        }
-        line.append(String.format("@attribute %s {no,yes}", attributes[attributes.length - 1])).append(newlineChar);
-        writer.write(line.toString());
-        line.setLength(0);
-        // writing data
-        line.append("@data").append(newlineChar);
-        writer.write(line.toString());
-        line.setLength(0);
-
-        for (DatasetInstance instance : dataset){
-            line.append(getStringLineFromDatasetInstance(instance));
+            // all attributes are numeric, except the last one which is binary
+            for (int i = 0; i < attributes.length - 1; i++) {
+                line.append(String.format("@attribute %s numeric", attributes[i])).append(newlineChar);
+                writer.write(line.toString());
+                line.setLength(0);
+            }
+            line.append(String.format("@attribute %s {no,yes}", attributes[attributes.length - 1])).append(newlineChar);
             writer.write(line.toString());
             line.setLength(0);
+            // writing data
+            line.append("@data").append(newlineChar);
+            writer.write(line.toString());
+            line.setLength(0);
+
+            for (DatasetInstance instance : dataset){
+                line.append(getStringLineFromDatasetInstance(instance));
+                writer.write(line.toString());
+                line.setLength(0);
+            }
         }
 
-        fos.close();
-        osw.close();
-        writer.close();
 
     }
 

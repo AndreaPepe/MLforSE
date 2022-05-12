@@ -1,7 +1,6 @@
 package controller;
 
 import csv.CSVManager;
-import exceptions.CSVException;
 import exceptions.CommitWithNoReleaseException;
 import jira.RetrieveReleases;
 import main.Main;

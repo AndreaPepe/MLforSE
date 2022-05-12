@@ -1,7 +1,6 @@
 package csv;
 
 import com.opencsv.CSVWriter;
-import exceptions.CSVException;
 
 import java.io.File;
 import java.io.FileWriter;
