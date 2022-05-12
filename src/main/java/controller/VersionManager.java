@@ -101,7 +101,7 @@ public class VersionManager {
                 this.versionsArray[i] = entry.getKey();
                 i++;
             }
-        } catch (IOException | CSVException e) {
+        } catch (IOException e) {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, "Exception", e);
         }
     }
@@ -188,7 +188,8 @@ public class VersionManager {
         for (Bug bug : bugWithNoRelease) {
             bugs.remove(bug);
         }
-        String log = String.format("\nNumber of bug in which proportion has been used: %d", numberOfProportion);
+        logger.info(System.getProperty("line.separator"));
+        String log = String.format("Number of bug in which proportion has been used: %d", numberOfProportion);
         logger.info(log);
         log = String.format("Proportion p: %f", this.proportion);
         logger.info(log);

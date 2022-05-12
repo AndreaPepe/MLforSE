@@ -30,6 +30,9 @@ public class WekaClassifierEvaluator {
         ConverterUtils.DataSource sourceTesting = new ConverterUtils.DataSource(streamTesting);
         Instances testing = sourceTesting.getDataSet();
 
+        streamTraining.close();
+        streamTesting.close();
+
         int numAttr = training.numAttributes();
         // setting the last attribute as the attribute to estimate
         training.setClassIndex(numAttr - 1);
@@ -40,7 +43,8 @@ public class WekaClassifierEvaluator {
         for (ClassifierType classifierName : this.classifiers) {
             classifier = handleClassifier(classifierName);
 
-            classifier.buildClassifier(training);
+            if(classifier != null)
+                classifier.buildClassifier(training);
 
             Evaluation eval = new Evaluation(testing);
 
@@ -62,15 +66,27 @@ public class WekaClassifierEvaluator {
     }
 
     private AbstractClassifier handleClassifier(ClassifierType classifierType) {
-        AbstractClassifier ret = null;
+
         switch (classifierType) {
-            case NaiveBayes -> ret = new NaiveBayes();
-            case J48 -> ret = new J48();
-            case RandomForest -> ret = new RandomForest();
-            case IBk -> ret = new IBk();
-            case ZeroR -> ret = new ZeroR();
-            default -> LoggerSingleton.getInstance().getLogger().info("Invalid classifier chosen");
+            case NAIVE_BAYES -> {
+                return new NaiveBayes();
+            }
+            case J48 -> {
+                return new J48();
+            }
+            case RANDOM_FOREST -> {
+                return new RandomForest();
+            }
+            case IBK -> {
+                return new IBk();
+            }
+            case ZERO_R -> {
+                return new ZeroR();
+            }
+            default -> {
+                LoggerSingleton.getInstance().getLogger().info("Invalid classifier chosen");
+                return null;
+            }
         }
-        return ret;
     }
 }

@@ -14,7 +14,7 @@ public class CSVManager {
     private CSVManager() {
     }
 
-    public static void csvWriteAll(String filename, List<String[]> lines) throws CSVException, IOException {
+    public static void csvWriteAll(String filename, List<String[]> lines) throws IOException {
         /*
             Write versions to a csv file using OpenCSV
             If the file already exists, delete it; create the file and write it.

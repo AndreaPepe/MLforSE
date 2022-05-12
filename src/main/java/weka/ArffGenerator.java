@@ -3,43 +3,51 @@ package weka;
 import model.DatasetInstance;
 
 import java.io.*;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.util.List;
 
 public class ArffGenerator {
+
+    private ArffGenerator(){}
 
     public static void generateArffFromDataset(String[] attributes, List<DatasetInstance> dataset, String relationName, String outputFilename)
             throws IOException {
         File file = new File(outputFilename);
         Files.deleteIfExists(file.toPath());
         FileOutputStream fos = new FileOutputStream(file);
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fos));
-        String line;
+        OutputStreamWriter osw = new OutputStreamWriter(fos);
+        BufferedWriter writer = new BufferedWriter(osw);
+        StringBuilder line = new StringBuilder();
 
+        String newlineChar = System.getProperty("line.separator");
         // writing header of arff file
-        line = String.format("@relation %s\n", relationName);
-        writer.write(line);
+        line.append(String.format("@relation %s", relationName)).append(newlineChar);
+        writer.write(line.toString());
+        line.setLength(0);
         // all attributes are numeric, except the last one which is binary
         for (int i = 0; i < attributes.length - 1; i++) {
-            line = String.format("@attribute %s numeric\n", attributes[i]);
-            writer.write(line);
+            line.append(String.format("@attribute %s numeric", attributes[i])).append(newlineChar);
+            writer.write(line.toString());
+            line.setLength(0);
         }
-        line = String.format("@attribute %s {no,yes}\n", attributes[attributes.length - 1]);
-        writer.write(line);
-
+        line.append(String.format("@attribute %s {no,yes}", attributes[attributes.length - 1])).append(newlineChar);
+        writer.write(line.toString());
+        line.setLength(0);
         // writing data
-        line = "@data\n";
-        writer.write(line);
+        line.append("@data").append(newlineChar);
+        writer.write(line.toString());
+        line.setLength(0);
 
         for (DatasetInstance instance : dataset){
-            line = getStringLineFromDatasetInstance(instance);
-            writer.write(line);
+            line.append(getStringLineFromDatasetInstance(instance));
+            writer.write(line.toString());
+            line.setLength(0);
         }
 
-        writer.close();
         fos.close();
+        osw.close();
+        writer.close();
+
     }
 
 

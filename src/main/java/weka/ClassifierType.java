@@ -1,9 +1,9 @@
 package weka;
 
 public enum ClassifierType {
-    RandomForest,
+    RANDOM_FOREST,
     J48,
-    NaiveBayes,
-    IBk,
-    ZeroR
+    NAIVE_BAYES,
+    IBK,
+    ZERO_R
 }

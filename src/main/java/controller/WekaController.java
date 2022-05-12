@@ -23,7 +23,7 @@ public class WekaController {
     private final int numReleases;
     private final List<String> releases;
 
-    public WekaController(String projectName, List<DatasetInstance> dataset, String[] datasetHeader){
+    public WekaController(String projectName, List<DatasetInstance> dataset, String[] datasetHeader) {
         this.projectName = projectName;
         this.datasetPerRelease = divideDatasetPerRelease(dataset);
         this.datasetHeader = datasetHeader;
@@ -35,7 +35,7 @@ public class WekaController {
      * This method implements the Walk Forward technique
      * to evaluate different classifiers on a given dataset.
      */
-    public List<ClassifierEvaluation> walkForward(){
+    public List<ClassifierEvaluation> walkForward() {
         List<ClassifierEvaluation> evaluations = new ArrayList<>();
         List<DatasetInstance> trainingSet;
         List<DatasetInstance> testingSet;
@@ -45,9 +45,9 @@ public class WekaController {
 
         WekaClassifierEvaluator evaluator = new WekaClassifierEvaluator();
 
-        for (int i = 1; i < numReleases - 1; i++){
+        for (int i = 1; i < numReleases - 1; i++) {
             trainingSetSize = i;
-            trainingSet = buildTrainingSet(i-1);
+            trainingSet = buildTrainingSet(i - 1);
             testingSet = this.datasetPerRelease.get(releases.get(i));
             evaluationToBeAdded = new ArrayList<>();
             // generate arff files for training and testing
@@ -58,25 +58,24 @@ public class WekaController {
                 relationName = this.projectName + "_testing";
                 ArffGenerator.generateArffFromDataset(datasetHeader, testingSet, relationName, TESTING_OUTPUT);
                 evaluationToBeAdded.addAll(evaluator.evaluateClassifiers(TRAINING_OUTPUT, TESTING_OUTPUT));
-                for(ClassifierEvaluation ce : evaluationToBeAdded){
+                for (ClassifierEvaluation ce : evaluationToBeAdded) {
                     ce.setTrainingSetSize(trainingSetSize);
                 }
                 evaluations.addAll(evaluationToBeAdded);
             } catch (IOException e) {
                 LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error generating arff files");
             } catch (Exception e) {
-                e.printStackTrace();
-//                LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error evaluating classifiers");
+                LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error evaluating classifiers");
             }
         }
 
         return evaluations;
     }
 
-    private List<DatasetInstance> buildTrainingSet(int indexOfLatestRelease){
+    private List<DatasetInstance> buildTrainingSet(int indexOfLatestRelease) {
         String release;
         List<DatasetInstance> ret = new ArrayList<>();
-        for (int i = 0; i <= indexOfLatestRelease; i++){
+        for (int i = 0; i <= indexOfLatestRelease; i++) {
             release = this.releases.get(i);
             ret.addAll(this.datasetPerRelease.get(release));
         }
@@ -84,10 +83,10 @@ public class WekaController {
     }
 
 
-    private Map<String, List<DatasetInstance>> divideDatasetPerRelease(List<DatasetInstance> dataset){
+    private Map<String, List<DatasetInstance>> divideDatasetPerRelease(List<DatasetInstance> dataset) {
         Map<String, List<DatasetInstance>> result = new LinkedHashMap<>();
-        for (DatasetInstance instance : dataset){
-            if (!result.containsKey(instance.getVersion())){
+        for (DatasetInstance instance : dataset) {
+            if (!result.containsKey(instance.getVersion())) {
                 // create a new entry in the hash map
                 result.put(instance.getVersion(), new ArrayList<>());
             }

@@ -119,8 +119,6 @@ public class DatasetCreator {
         }
         if (notPresent)
             dataset.add(instance);
-        //else if (dataset.get(idx).getVersion().equals(release))
-            //logger.info("Instance already present in dataset: [" + dataset.get(idx).getFilename() + ", " + release);
     }
 
     private void handleCopy(DiffEntry entry, String release, RevCommit commit) {
@@ -208,32 +206,16 @@ public class DatasetCreator {
             // consistency check
             return;
         }
+
+        if (!dataset.get(idx).getVersion().equals(release)){
+            // if the file is not present in the current release , we have nothing to rename
+            return;
+        }
         // renaming is only with the already inserted files of the CURRENT RELEASE
         dataset.get(idx).addPreviousName(entry.getOldPath());
         dataset.get(idx).setFilename(entry.getNewPath());
         dataset.get(idx).incrementNumberOfRevisions();
         dataset.get(idx).addAuthor(author.getName());
-        /*
-        if (dataset.get(idx).getVersion().equals(release)) {
-            // if in the same release, change only the name
-            dataset.get(idx).addPreviousName(entry.getOldPath());
-            dataset.get(idx).setFilename(entry.getNewPath());
-            // add author
-            dataset.get(idx).addAuthor(author.getName());
-            // increment number of revisions
-            dataset.get(idx).incrementNumberOfRevisions();
-        } else {
-            DatasetInstance newInstance = new DatasetInstance(dataset.get(idx), release);
-            newInstance.addPreviousName(entry.getOldPath());
-            newInstance.setFilename(entry.getNewPath());
-            dataset.remove(idx);
-            //add new author
-            newInstance.addAuthor(author.getName());
-            // increment number of revisions
-            newInstance.incrementNumberOfRevisions();
-            dataset.add(newInstance);
-        }
-*/
 
         //TODO: check if there is need to calculate stats
     }

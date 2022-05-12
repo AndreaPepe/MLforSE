@@ -178,7 +178,8 @@ public class Main {
             }
         }
 
-        log = String.format("\nDataset size: %d instances", dataset.size());
+        logger.info(System.getProperty("line.separator"));
+        log = String.format("Dataset size: %d instances", dataset.size());
         logger.info(log);
         log = String.format("Buggy instances: %d", numBuggy);
         logger.info(log);
@@ -229,6 +230,8 @@ public class Main {
         HINT: during the creation of the actual dataset, at the end of each release save the current state of the
         dataset and that is the dataset Snoring-affected at the i-th release.
          */
+        logger.info("Walk Forward technique to evaluate classifiers is running ...");
+
         List<ClassifierEvaluation> evaluations = wekaController.walkForward();
         List<String[]> evaluationsToCsv = new ArrayList<>();
         String[] header = new String[] {
