@@ -157,27 +157,34 @@ public class Main {
         logger.info("\nDataset creation. DONE");
 
         int numBuggy = 0;
-        List<String[]> newSet = new ArrayList<>();
-        List<String[]> toAdd = new ArrayList<>();
         int numDuplicates = 0;
+
+        HashMap<String, List<DatasetInstance>> datasetByRelease = new HashMap<>();
         for (DatasetInstance instance : dataset) {
-            //check for duplicates
-            String[] newEntry = new String[]{instance.getVersion(), instance.getFilename()};
-            for (String[] arrayEntry : newSet) {
-                if (arrayEntry[0].equals(newEntry[0]) && arrayEntry[1].equals(newEntry[1])) {
+            if (!datasetByRelease.containsKey(instance.getVersion())) {
+                datasetByRelease.put(instance.getVersion(), new ArrayList<>());
+            }
+            datasetByRelease.get(instance.getVersion()).add(instance);
+        }
+
+        List<DatasetInstance> toRemove = new ArrayList<>();
+        for (Map.Entry<String, List<DatasetInstance>> release : datasetByRelease.entrySet()) {
+            List<String> filenames = new ArrayList<>();
+
+            for (DatasetInstance instance : release.getValue()) {
+                if (instance.isBuggy()) {
+                    numBuggy++;
+                }
+
+                if (filenames.contains(instance.getFilename())) {
                     numDuplicates++;
+                    toRemove.add(instance);
                 } else {
-                    toAdd.add(new String[]{instance.getVersion(), instance.getFilename()});
+                    filenames.add(instance.getFilename());
                 }
             }
-            newSet.addAll(toAdd);
-            toAdd = new ArrayList<>();
-
-            // get number of buggy instances
-            if (instance.isBuggy()) {
-                numBuggy++;
-            }
         }
+        dataset.removeAll(toRemove);
 
         logger.info(System.getProperty("line.separator"));
         log = String.format("Dataset size: %d instances", dataset.size());
@@ -227,18 +234,12 @@ public class Main {
         //TODO
         //WekaController wekaController = new WekaController(projectName, dataset, wekaHeader);
         WekaController wekaController = new WekaController(projectName, datasetsWithSnoring, wekaHeader);
-        /*
-        TODO: maintain a list of different datasets in order to apply Walk Forward using training set with Snoring
-        HINT: during the creation of the actual dataset, at the end of each release save the current state of the
-        dataset and that is the dataset Snoring-affected at the i-th release.
-         */
         logger.info("Walk Forward technique to evaluate classifiers is running ...");
 
-        //TODO:
 //        List<ClassifierEvaluation> evaluations = wekaController.walkForward();
         List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring();
         List<String[]> evaluationsToCsv = new ArrayList<>();
-        String[] header = new String[] {
+        String[] header = new String[]{
                 "Dataset",
                 "#TrainingRelease",
                 "Classifier",
@@ -248,7 +249,7 @@ public class Main {
                 "Kappa"
         };
         evaluationsToCsv.add(header);
-        for (ClassifierEvaluation ce : evaluations){
+        for (ClassifierEvaluation ce : evaluations) {
             evaluationsToCsv.add(ce.toStringArray(projectName));
         }
 

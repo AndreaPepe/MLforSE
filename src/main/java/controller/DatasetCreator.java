@@ -25,7 +25,7 @@ public class DatasetCreator {
     private List<DatasetInstance> dataset;
     private int indexOfCurrentRelease = 0;
 
-    //TODO
+
     private Map<String, List<DatasetInstance>> datasetsWithSnoring;
 
     public Map<String, List<DatasetInstance>> getMultipleDatasets() {
@@ -51,7 +51,6 @@ public class DatasetCreator {
         gitManager.setDiffFormatter(); // prepare the diff formatter to filter only java files, excluding tests
         dataset = new ArrayList<>();
 
-        //TODO: here
         datasetsWithSnoring = new LinkedHashMap<>();
 
         RevCommit prev = null;
@@ -71,7 +70,6 @@ public class DatasetCreator {
             }
 
             /*
-            TODO:
             At the end of each release, clone the actual state of the dataset in the list to have the training set for Walk Forward
              */
             if (versionManager.getHalfVersions().containsKey(release.getKey())) {
@@ -122,13 +120,6 @@ public class DatasetCreator {
     }
 
     private void handleAdd(DiffEntry entry, String release, RevCommit commit) {
-        PersonIdent author = commit.getAuthorIdent();
-        LocalDate creationDate = author.getWhen().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-        DatasetInstance instance = new DatasetInstance(release, entry.getNewPath(), creationDate, false);
-        instance.addAuthor(author.getName());
-        // number of Revisions does not need to be incremented because it's already initialized to 1
-        computeLocChanges(entry, instance);
         List<DatasetInstance> currentRelease = dataset.subList(this.indexOfCurrentRelease, this.dataset.size());
         boolean notPresent = true;
         for (DatasetInstance i : currentRelease) {
@@ -137,8 +128,18 @@ public class DatasetCreator {
                 break;
             }
         }
-        if (notPresent)
-            dataset.add(instance);
+        if (!notPresent) {
+            // file already exists
+            return;
+        }
+        PersonIdent author = commit.getAuthorIdent();
+        LocalDate creationDate = author.getWhen().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+        DatasetInstance instance = new DatasetInstance(release, entry.getNewPath(), creationDate, false);
+        instance.addAuthor(author.getName());
+        instance.incrementNumberOfRevisions();
+        computeLocChanges(entry, instance);
+        dataset.add(instance);
     }
 
     private void handleCopy(DiffEntry entry, String release, RevCommit commit) {
@@ -150,21 +151,21 @@ public class DatasetCreator {
         int idx = getLatestInstanceByName(oldName);
         if (idx < 0)
             return;
-        dataset.get(idx).incrementNumberOfRevisions();
-        dataset.get(idx).addAuthor(author.getName());
-        if (oldName.equals(newName))
+        if (Objects.equals(oldName, newName))
             return;
-        DatasetInstance newInstance = new DatasetInstance(dataset.get(idx), release);
-        newInstance.setFilename(newName);
-
-        // add the author for both instances
-        newInstance.addAuthor(author.getName());
-        dataset.add(newInstance);
+        DatasetInstance oldInstance = dataset.get(idx);
+        oldInstance.incrementNumberOfRevisions();
+        oldInstance.addAuthor(author.getName());
+        // handle it as a renaming, because additions cause duplicates
+        oldInstance.addPreviousName(oldInstance.getFilename());
+        oldInstance.setFilename(newName);
     }
 
     private void handleDelete(DiffEntry entry, String release) {
         // remove only if there is an instance with the same release
-        int idx = getLatestInstanceByName(entry.getNewPath());
+        // because instances at the end of the previous release in advance
+        // put in the current release
+        int idx = getLatestInstanceByName(entry.getOldPath());
         if (idx < 0)
             return;
         if (this.dataset.get(idx).getVersion().equals(release))
@@ -175,12 +176,17 @@ public class DatasetCreator {
 
     private void handleModify(DiffEntry entry, String release, RevCommit commit) {
         int indexLatest = getLatestInstanceByName(entry.getNewPath());
-        if (indexLatest < 0 || !this.dataset.get(indexLatest).getVersion().equals(release)) {
-            // file does not exist or is not in this release (it has been deleted)
+        if (indexLatest < 0) {
+            // file does not exist
             return;
         }
         //old instance
         DatasetInstance instance = this.dataset.get(indexLatest);
+
+        if (!instance.getVersion().equals(release)) {
+            // the latest release in which the file is present is not the current, so it has been deleted
+            return;
+        }
 
         // Get bugs in order to detect if the instance is BUGGY
         List<Bug> commitBugs = getBugsOfCommit(this.bugs, commit);
@@ -236,8 +242,6 @@ public class DatasetCreator {
         dataset.get(idx).setFilename(entry.getNewPath());
         dataset.get(idx).incrementNumberOfRevisions();
         dataset.get(idx).addAuthor(author.getName());
-
-        //TODO: check if there is need to calculate stats
     }
 
     private int getLatestInstanceByName(String filename) {
@@ -300,7 +304,7 @@ public class DatasetCreator {
         for (DatasetInstance instance : this.dataset) {
             // create a new instance to make a copy by value and not by reference, so
             // the newly created instance will not be affected by changes in the original one
-            ret.add(new DatasetInstance(instance, instance.getVersion()));
+            ret.add(new DatasetInstance(instance));
         }
         return ret;
     }

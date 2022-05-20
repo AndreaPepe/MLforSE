@@ -51,7 +51,6 @@ public class WekaClassifierEvaluator {
 
             eval.evaluateModel(classifier, testing);
 
-            // TODO: estimate precision also on other metrics
             classifierEvaluations.add(new ClassifierEvaluation(
                     classifierName.toString(),
                     eval.precision(1),

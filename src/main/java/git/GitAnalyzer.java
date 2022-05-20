@@ -8,6 +8,8 @@ import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class GitAnalyzer {
 
@@ -35,10 +37,28 @@ public class GitAnalyzer {
         ArrayList<RevCommit> results = new ArrayList<>();
         for (RevCommit commit : commits) {
             // comparison is done without lower case
-            if (commit.getFullMessage().contains(target))
+            if (isExactlyContained(commit.getFullMessage(), target))
                 results.add(commit);
         }
 
         return results;
+    }
+
+    /**
+     * This method is used to avoid incorrect results obtained with the
+     * contains() method of strings.
+     * E.g. if "TICKET-123" is present in the source, and we search for the
+     * string "TICKET-1", the result is true with contains(), but is false
+     * using the following method.
+     *
+     * @param source The source text
+     * @param target The string to exactly find
+     * @return true if the target string is found, false otherwise
+     */
+    private boolean isExactlyContained(String source, String target){
+        String pattern = "\\b" + target + "\\b";
+        Pattern p = Pattern.compile(pattern);
+        Matcher m = p.matcher(source);
+        return m.find();
     }
 }

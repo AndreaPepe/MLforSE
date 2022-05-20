@@ -26,12 +26,18 @@ public class DatasetInstance {
     private Set<String> fixedBugs;              // set of fixed bugs, used to calculate the number of fixed bugs
     private int age;                            // age of the file in weeks
 
+    private int historicalLocTouched;           // number of LOC touched in the history of the file, used to compute the Weighted Age
+    private int historicalNumberOfRevisions;    // number of total commits that touched the file from its existence
+
+
     public DatasetInstance(String version, String filename, LocalDate creationDate, boolean buggy) {
         this.version = version;
         this.filename = filename;
         this.authors = new HashSet<>();
         this.creationDate = creationDate;
         this.previousNames = new HashSet<>();
+        this.historicalLocTouched = 0;
+        this.historicalNumberOfRevisions = 0;
 
         // features
         this.size = 0;
@@ -39,13 +45,42 @@ public class DatasetInstance {
         this.locAdded = 0;
         this.maxLocAdded = 0;
         this.avgLocAdded = 0f;
-        this.numberOfRevisions = 1;
+        this.numberOfRevisions = 0;
         this.churn = 0;
         this.maxChurn = 0;
         this.avgChurn = 0f;
         this.age = 0;
         this.fixedBugs = new HashSet<>();
         this.buggy = buggy;
+    }
+
+    /**
+     * This constructor is used to clone an instance for backup purposes
+     * @param instance the instance to be cloned
+     */
+    public DatasetInstance(DatasetInstance instance){
+        this.version = instance.getVersion();
+
+        this.filename = instance.getFilename();
+        this.creationDate = instance.getCreationDate();
+        this.authors = instance.getAuthors();
+        this.previousNames = instance.getPreviousNames();
+        this.historicalLocTouched = instance.getHistoricalLocTouched();
+        this.historicalNumberOfRevisions = instance.getHistoricalNumberOfRevisions();
+
+        // features
+        this.size = instance.getSize();
+        this.locTouched = instance.getLocTouched();
+        this.locAdded = instance.getLocAdded();
+        this.maxLocAdded = instance.getMaxLocAdded();
+        this.avgLocAdded = instance.getAvgLocAdded();
+        this.numberOfRevisions = instance.getNumberOfRevisions();
+        this.churn = instance.getChurn();
+        this.maxChurn = instance.getMaxChurn();
+        this.avgChurn = instance.getAvgChurn();
+        this.age = instance.getAge();
+        this.fixedBugs = instance.getFixedBugs();
+        this.buggy = instance.isBuggy();
     }
 
     public DatasetInstance(DatasetInstance old, String newRelease) {
@@ -56,20 +91,22 @@ public class DatasetInstance {
         this.creationDate = old.getCreationDate();
         this.authors = old.getAuthors();
         this.previousNames = old.getPreviousNames();
+        this.historicalLocTouched = old.getHistoricalLocTouched();
+        this.historicalNumberOfRevisions = old.getHistoricalNumberOfRevisions();
 
         // features
         this.size = old.getSize();
-        this.locTouched = old.getLocTouched();
-        this.locAdded = old.getLocAdded();
+        this.locTouched = 0;
+        this.locAdded = 0;
         this.maxLocAdded = old.getMaxLocAdded();
         this.avgLocAdded = old.getAvgLocAdded();
-        this.numberOfRevisions = old.getNumberOfRevisions();
-        this.churn = old.getChurn();
+        this.numberOfRevisions = 0;
+        this.churn = 0;
         this.maxChurn = old.getMaxChurn();
         this.avgChurn = old.getAvgChurn();
         this.age = old.getAge();
         this.fixedBugs = old.getFixedBugs();
-        this.buggy = old.isBuggy();
+        this.buggy = false;
     }
 
     public String getVersion() {
@@ -212,6 +249,14 @@ public class DatasetInstance {
         this.age = age;
     }
 
+    public int getHistoricalLocTouched(){ return historicalLocTouched;}
+
+    public void setHistoricalLocTouched(int historicalLocTouched){ this.historicalLocTouched = historicalLocTouched;}
+
+    public int getHistoricalNumberOfRevisions(){ return historicalNumberOfRevisions;}
+
+    public void setHistoricalNumberOfRevisions(int historicalNumberOfRevisions){this.historicalNumberOfRevisions = historicalNumberOfRevisions;}
+
     public void addPreviousName(String oldPath) {
         this.previousNames.add(oldPath);
     }
@@ -219,21 +264,23 @@ public class DatasetInstance {
     public void addChurn(int churn) {
         this.churn += churn;
         this.maxChurn = Math.max(this.maxChurn, churn);
-        this.avgChurn = (float) this.churn / this.numberOfRevisions;
+        this.avgChurn = (float) this.churn / this.historicalNumberOfRevisions;
     }
 
     public void incrementNumberOfRevisions() {
         this.numberOfRevisions++;
+        this.historicalNumberOfRevisions++;
     }
 
     public void addLocTouched(int locTouched) {
         this.locTouched += locTouched;
+        this.historicalLocTouched += locTouched;
     }
 
     public void addLocAdded(int locAdded) {
         this.locAdded += locAdded;
         this.maxLocAdded = Math.max(this.maxLocAdded, locAdded);
-        this.avgLocAdded = (float) this.locAdded / this.numberOfRevisions;
+        this.avgLocAdded = (float) this.locAdded / this.historicalNumberOfRevisions;
     }
 
     public void addFixedBug(String bugTicket){
@@ -241,7 +288,7 @@ public class DatasetInstance {
     }
 
     public float getWeightedAge(){
-        return (float)this.age/this.locTouched;
+        return (float)this.age/this.historicalLocTouched;
     }
 
     public int getNumberOfAuthors(){
