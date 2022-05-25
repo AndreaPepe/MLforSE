@@ -317,8 +317,8 @@ public class DatasetCreator {
         int size = instance.getSize();
         int linesAdded = 0;
         int linesDeleted = 0;
-        int currentAdd = 0;
-        int currentDelete = 0;
+        int currentAdd;
+        int currentDelete;
         try {
             List<Edit> edits = df.toFileHeader(diff).toEditList();
             for (Edit edit : edits) {

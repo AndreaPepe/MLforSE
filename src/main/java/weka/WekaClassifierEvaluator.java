@@ -1,15 +1,22 @@
 package weka;
 
 import logging.LoggerSingleton;
+import weka.attributeSelection.CfsSubsetEval;
+import weka.attributeSelection.GreedyStepwise;
 import weka.classifiers.AbstractClassifier;
 import weka.classifiers.Evaluation;
 import weka.classifiers.bayes.NaiveBayes;
 import weka.classifiers.lazy.IBk;
+import weka.classifiers.meta.FilteredClassifier;
 import weka.classifiers.rules.ZeroR;
 import weka.classifiers.trees.J48;
 import weka.classifiers.trees.RandomForest;
+import weka.core.Attribute;
 import weka.core.Instances;
 import weka.core.converters.ConverterUtils;
+import weka.filters.Filter;
+import weka.filters.supervised.attribute.AttributeSelection;
+import weka.filters.supervised.instance.SpreadSubsample;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -34,22 +41,74 @@ public class WekaClassifierEvaluator {
             testing = sourceTesting.getDataSet();
         }
 
-        int numAttr = training.numAttributes();
+        /*
+         * Perform feature selection
+         * using Backward Search greedy algorithm, because the number of
+         * features is relatively small and so it does not cost so much in terms of
+         * execution time. Moreover, the main goal is to eliminate redundant features.
+         */
+        AttributeSelection filter = new AttributeSelection();
+        CfsSubsetEval evaluator = new CfsSubsetEval();
+        // algorithm
+        GreedyStepwise search = new GreedyStepwise();
+        search.setSearchBackwards(true);
+
+        filter.setEvaluator(evaluator);
+        filter.setSearch(search);
+
+        filter.setInputFormat(training);
+        Instances trainingFiltered = Filter.useFilter(training, filter);
+        List<String> oldAttributes = new ArrayList<>();
+        for (int i = 0; i < training.numAttributes(); i++) {
+            oldAttributes.add(training.attribute(i).name());
+        }
+        List<String> filteredAttributes = new ArrayList<>();
+        for (int i=0; i < trainingFiltered.numAttributes(); i++){
+            filteredAttributes.add(trainingFiltered.attribute(i).name());
+        }
+
+        LoggerSingleton.getInstance().getLogger().info("Original features: " + training.numAttributes() + " Filtered features: " + trainingFiltered.numAttributes());
+        for (String feature: oldAttributes){
+            if (!filteredAttributes.contains(feature)){
+                LoggerSingleton.getInstance().getLogger().info("Removed feature: " + feature);
+            }
+        }
+
+
+        // apply filter also on testing set
+        // but with the same filtering of the training set, otherwise we could have different results!
+        Instances testingFiltered = Filter.useFilter(testing, filter);
+
+        int numAttr = trainingFiltered.numAttributes();
         // setting the last attribute as the attribute to estimate
-        training.setClassIndex(numAttr - 1);
-        testing.setClassIndex(numAttr - 1);
+        trainingFiltered.setClassIndex(numAttr - 1);
+        testingFiltered.setClassIndex(numAttr - 1);
 
         AbstractClassifier classifier;
+
+
+
         List<ClassifierEvaluation> classifierEvaluations = new ArrayList<>();
         for (ClassifierType classifierName : this.classifiers) {
             classifier = handleClassifier(classifierName);
 
+            // to do sampling
+            FilteredClassifier filteredClassifier = new FilteredClassifier();
+            SpreadSubsample spreadSubsample = new SpreadSubsample();
+            String[] options = new String[]{"-M", "1.0"};
+            spreadSubsample.setOptions(options);
+
+            filteredClassifier.setClassifier(classifier);
+            // Under-sampling
+            filteredClassifier.setFilter(spreadSubsample);
+
+
             if (classifier != null)
-                classifier.buildClassifier(training);
+                filteredClassifier.buildClassifier(trainingFiltered);
 
-            Evaluation eval = new Evaluation(testing);
+            Evaluation eval = new Evaluation(testingFiltered);
 
-            eval.evaluateModel(classifier, testing);
+            eval.evaluateModel(filteredClassifier, testingFiltered);
 
             classifierEvaluations.add(new ClassifierEvaluation(
                     classifierName.toString(),
