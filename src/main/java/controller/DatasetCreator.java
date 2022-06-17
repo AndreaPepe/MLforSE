@@ -111,7 +111,7 @@ public class DatasetCreator {
         for (DiffEntry diff : diffs) {
             switch (diff.getChangeType()) {
                 case ADD -> handleAdd(diff, release, current);
-                case COPY -> handleCopy(diff, release, current);
+                case COPY -> handleCopy(diff, current);
                 case DELETE -> handleDelete(diff, release);
                 case MODIFY -> handleModify(diff, release, current);
                 case RENAME -> handleRename(diff, release, current);
@@ -142,7 +142,7 @@ public class DatasetCreator {
         dataset.add(instance);
     }
 
-    private void handleCopy(DiffEntry entry, String release, RevCommit commit) {
+    private void handleCopy(DiffEntry entry, RevCommit commit) {
         PersonIdent author = commit.getAuthorIdent();
         // copy an existing file to a new location maintaining the content
         // let's add the new file, but we must also transfer the buggy attribute of the existing file

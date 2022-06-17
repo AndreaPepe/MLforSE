@@ -14,6 +14,14 @@ public class RetrieveTicketsID {
     private RetrieveTicketsID() {}
 
 
+    /**
+     * Assumptions: retrieve only tickets of type <i>Bug</i> and that are closed
+     * or resolved with resolution <i>Fixed</i>.
+     * @param projectName the name of the project
+     * @return A list of tickets
+     * @throws IOException Error in IO communication
+     * @throws JSONException Error occurred while parsing the JSON response from Jira
+     */
     public static List<JiraTicket> getTicketsID(String projectName) throws IOException, JSONException {
         int j;
         int i = 0;

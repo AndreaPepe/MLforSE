@@ -26,8 +26,8 @@ import java.util.List;
 public class WekaClassifierEvaluator {
 
     // false negatives cost 10 times false positives
-    private final Double CFP = 1.0;
-    private final Double CFN = 10 * CFP;
+    private static final Double CFP = 1.0;
+    private static final Double CFN = 10 * CFP;
 
     private final List<ClassifierType> classifiers = Arrays.asList(ClassifierType.values());
 
@@ -128,20 +128,20 @@ public class WekaClassifierEvaluator {
             }
 
             boolean usedSensitivity = costSensitivity != CostSensitivity.NO_COST_SENSITIVITY;
-            ClassifierEvaluation record = new ClassifierEvaluation(
+            ClassifierEvaluation ce = new ClassifierEvaluation(
                     classifierName.toString(),
                     true,
                     true,
                     usedSensitivity);
-            record.setPrecision(eval.precision(1));
-            record.setRecall(eval.recall(1));
-            record.setAuc(eval.areaUnderROC(1));
-            record.setKappa(eval.kappa());
-            record.setTruePositive((int) eval.numTruePositives(1));
-            record.setFalsePositive((int) eval.numFalsePositives(1));
-            record.setTrueNegative((int) eval.numTrueNegatives(1));
-            record.setFalseNegative((int) eval.numFalseNegatives(1));
-            classifierEvaluations.add(record);
+            ce.setPrecision(eval.precision(1));
+            ce.setRecall(eval.recall(1));
+            ce.setAuc(eval.areaUnderROC(1));
+            ce.setKappa(eval.kappa());
+            ce.setTruePositive((int) eval.numTruePositives(1));
+            ce.setFalsePositive((int) eval.numFalsePositives(1));
+            ce.setTrueNegative((int) eval.numTrueNegatives(1));
+            ce.setFalseNegative((int) eval.numFalseNegatives(1));
+            classifierEvaluations.add(ce);
 
         }
         return classifierEvaluations;

@@ -85,7 +85,7 @@ public class Main {
         /*--------------------------------------------------------JIRA (RELEASES + TICKETS)-------------------------------------------------------*/
 
         /*
-        The constructor of the VersionManager retrieves all the released version for the specified project,
+        The setReleases() method of the VersionManager class retrieves all the released version for the specified project,
         store them sorted chronologically, both all versions and the first half of them.
          */
         logger.info("Retrieving project's releases from Jira ...");
@@ -98,13 +98,13 @@ public class Main {
         /*
          * Now, let's interact with Jira again to retrieve tickets of all fixed bugs
          * */
-        ArrayList<JiraTicket> tickets = (ArrayList<JiraTicket>) RetrieveTicketsID.getTicketsID(projectName);
+        List<JiraTicket> tickets = RetrieveTicketsID.getTicketsID(projectName);
         log = String.format("Jira tickets: %d", tickets.size());
         logger.info(log);
 
         /*---------------------------------------------------------------------GIT-------------------------------------------------------------*/
         /*
-         * Now, for each ticket, let see in which Git commit is present
+         * Now, for each ticket, let see in which Git commit it is present
          * */
 
         logger.info("\nRetrieving commits from Git ...");
@@ -124,22 +124,7 @@ public class Main {
             bugs.add(new Bug(ticket));
         }
 
-        // let's process bugs with commits to define fix commit and other commits for the specific bug
-        BugManager.setFixCommitAndOtherCommits(bugs, fixCommits);
-
-        /* now, remove bugs with no bounded commit and add metadata on which is its fixing commit
-         * That can be chosen in 2 ways:
-         *  - if Jira fix date corresponds to commit date, then that commit is the fix commit
-         *  - otherwise, the latest commit referring that bug is chosen as FixCommit
-         *
-         * Bugs with no such commits are removed from the list.
-         */
-
-        BugManager.patchFixCommit(bugs);
-
-        // sort bugs by time to avoid influence of future bugs on past data
-        // this allows to build training datasets Snoring-affected to be used in Wal Forward approach to validate the predictor
-        BugManager.sortBugsChronologically(bugs);
+        refineBugsList(bugs, fixCommits);
 
         bugs = versionManager.calculateVersionsForBugs(bugs);
         logger.info("\nIdentification of FV, OV, AVs and IV for bugs. DONE");
@@ -157,6 +142,69 @@ public class Main {
         Map<String, List<DatasetInstance>> datasetsWithSnoring = datasetCreator.getMultipleDatasets();
         logger.info("\nDataset creation. DONE");
 
+        // remove duplicated instances from both dataset and datasetWithSnoring
+        removeDatasetDuplicates(dataset, datasetsWithSnoring, logger);
+
+        // Building the CSV file
+        List<String[]> arrayOfCSVEntry = new ArrayList<>();
+        // add headings
+        String[] csvHeader = buildDatasetHeader();
+
+        arrayOfCSVEntry.add(csvHeader);
+
+        for (DatasetInstance entry : dataset) {
+            arrayOfCSVEntry.add(entry.toStringArray());
+        }
+
+        CSVManager.csvWriteAll(projectName.toLowerCase(Locale.ROOT) + "_dataset.csv", arrayOfCSVEntry);
+
+
+        /*--------------------------------------------------------------WEKA-----------------------------------------------------------*/
+
+        // throw away the first 2 columns (release and filename)
+        String[] wekaHeader = Arrays.copyOfRange(csvHeader, 2, csvHeader.length);
+
+        WekaController wekaController = new WekaController(projectName, datasetsWithSnoring, wekaHeader);
+        logger.info("Walk Forward technique to evaluate classifiers is running ...");
+
+        // Do the comparison of results changing the cost sensitivity technique
+        for (CostSensitivity sensitivity : CostSensitivity.values()) {
+            log = "Classifiers evaluation with cost sensitivity policy: " + sensitivity.toString();
+            logger.info(log);
+            List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring(sensitivity);
+            List<String[]> evaluationsToCsv = new ArrayList<>();
+            String[] header = buildClassifiersHeader();
+            evaluationsToCsv.add(header);
+            for (ClassifierEvaluation ce : evaluations) {
+                evaluationsToCsv.add(ce.toStringArray(projectName));
+            }
+            StringBuilder builder = new StringBuilder();
+            builder.append(projectName).append("_").append(sensitivity.toString()).append(".csv");
+            CSVManager.csvWriteAll(builder.toString(), evaluationsToCsv);
+        }
+    }
+
+    private static void refineBugsList(List<Bug> bugs, List<GitCommit> fixCommits){
+        // let's process bugs with commits to define fix commit and other commits for the specific bug
+        BugManager.setFixCommitAndOtherCommits(bugs, fixCommits);
+
+        /** now, remove bugs with no bounded commit and add metadata on which is its fixing commit
+         * That can be chosen in 2 ways:
+         *  - if Jira fix date corresponds to commit date, then that commit is the fix commit
+         *  - otherwise, the latest commit referring that bug is chosen as FixCommit
+         *
+         * Bugs with no such commits are removed from the list.
+         */
+
+        BugManager.patchFixCommit(bugs);
+
+        // sort bugs by time to avoid influence of future bugs on data of the past
+        // this allows to build training datasets Snoring-affected to be used in Walking Forward approach to validate the predictor
+        BugManager.sortBugsChronologically(bugs);
+    }
+
+
+    private static void removeDatasetDuplicates(List<DatasetInstance> dataset, Map<String,List<DatasetInstance>> datasetWithSnoring, Logger logger){
         int numBuggy = 0;
         int numDuplicates = 0;
 
@@ -185,10 +233,15 @@ public class Main {
                 }
             }
         }
+
         dataset.removeAll(toRemove);
 
+        for (DatasetInstance i : toRemove){
+            datasetWithSnoring.get(i.getVersion()).remove(i);
+        }
+
         logger.info(System.getProperty("line.separator"));
-        log = String.format("Dataset size: %d instances", dataset.size());
+        String log = String.format("Dataset size: %d instances", dataset.size());
         logger.info(log);
         log = String.format("Buggy instances: %d", numBuggy);
         logger.info(log);
@@ -196,43 +249,6 @@ public class Main {
         logger.info(log);
         log = String.format("Number of duplicated instances: %d", numDuplicates);
         logger.info(log);
-
-
-        // Building the CSV file
-        List<String[]> arrayOfCSVEntry = new ArrayList<>();
-        // add headings
-        String[] csvHeader = buildDatasetHeader();
-
-        arrayOfCSVEntry.add(csvHeader);
-
-        for (DatasetInstance entry : dataset) {
-            arrayOfCSVEntry.add(entry.toStringArray());
-        }
-
-        CSVManager.csvWriteAll(projectName.toLowerCase(Locale.ROOT) + "_dataset.csv", arrayOfCSVEntry);
-
-
-        /*--------------------------------------------------------------WEKA-----------------------------------------------------------*/
-
-        // throw away the first 2 columns (release and filename)
-        String[] wekaHeader = Arrays.copyOfRange(csvHeader, 2, csvHeader.length);
-
-        WekaController wekaController = new WekaController(projectName, datasetsWithSnoring, wekaHeader);
-        logger.info("Walk Forward technique to evaluate classifiers is running ...");
-
-        // Do the comparison of results changing the cost sensitivity technique
-        for (CostSensitivity sensitivity : CostSensitivity.values()) {
-            List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring(sensitivity);
-            List<String[]> evaluationsToCsv = new ArrayList<>();
-            String[] header = buildClassifiersHeader();
-            evaluationsToCsv.add(header);
-            for (ClassifierEvaluation ce : evaluations) {
-                evaluationsToCsv.add(ce.toStringArray(projectName));
-            }
-            StringBuilder builder = new StringBuilder();
-            builder.append(projectName).append("_").append(sensitivity.toString()).append(".csv");
-            CSVManager.csvWriteAll(builder.toString(), evaluationsToCsv);
-        }
     }
 
 
