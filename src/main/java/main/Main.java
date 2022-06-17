@@ -23,6 +23,7 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import weka.ClassifierEvaluation;
+import weka.CostSensitivity;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -200,23 +201,7 @@ public class Main {
         // Building the CSV file
         List<String[]> arrayOfCSVEntry = new ArrayList<>();
         // add headings
-        String[] csvHeader = new String[]{
-                "Release",
-                "Filename",
-                "Size",
-                "LOC_touched",
-                "LOC_added",
-                "MAX_LOC_added",
-                "AVG_LOC_added",
-                "NR",
-                "NAuth",
-                "Churn",
-                "MAX_Churn",
-                "AVG_Churn",
-                "NFix",
-                "Age",
-                "WeightedAge",
-                "Buggy"};
+        String[] csvHeader = buildDatasetHeader();
 
         arrayOfCSVEntry.add(csvHeader);
 
@@ -235,9 +220,45 @@ public class Main {
         WekaController wekaController = new WekaController(projectName, datasetsWithSnoring, wekaHeader);
         logger.info("Walk Forward technique to evaluate classifiers is running ...");
 
-        List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring();
-        List<String[]> evaluationsToCsv = new ArrayList<>();
-        String[] header = new String[]{
+        // Do the comparison of results changing the cost sensitivity technique
+        for (CostSensitivity sensitivity : CostSensitivity.values()) {
+            List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring(sensitivity);
+            List<String[]> evaluationsToCsv = new ArrayList<>();
+            String[] header = buildClassifiersHeader();
+            evaluationsToCsv.add(header);
+            for (ClassifierEvaluation ce : evaluations) {
+                evaluationsToCsv.add(ce.toStringArray(projectName));
+            }
+            StringBuilder builder = new StringBuilder();
+            builder.append(projectName).append("_").append(sensitivity.toString()).append(".csv");
+            CSVManager.csvWriteAll(builder.toString(), evaluationsToCsv);
+        }
+    }
+
+
+    private static String[] buildDatasetHeader(){
+        return new String[]{
+                "Release",
+                "Filename",
+                "Size",
+                "LOC_touched",
+                "LOC_added",
+                "MAX_LOC_added",
+                "AVG_LOC_added",
+                "NR",
+                "NAuth",
+                "Churn",
+                "MAX_Churn",
+                "AVG_Churn",
+                "NFix",
+                "Age",
+                "WeightedAge",
+                "Buggy"};
+    }
+
+
+    private static String[] buildClassifiersHeader(){
+        return new String[]{
                 "Dataset",
                 "#TrainingRelease",
                 "%Training",
@@ -256,13 +277,5 @@ public class Main {
                 "AUC",
                 "Kappa"
         };
-        evaluationsToCsv.add(header);
-        for (ClassifierEvaluation ce : evaluations) {
-            evaluationsToCsv.add(ce.toStringArray(projectName));
-        }
-
-        CSVManager.csvWriteAll(projectName + "_classifier_evaluation.csv", evaluationsToCsv);
     }
-
-
 }

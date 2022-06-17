@@ -4,6 +4,7 @@ import logging.LoggerSingleton;
 import model.DatasetInstance;
 import weka.ArffGenerator;
 import weka.ClassifierEvaluation;
+import weka.CostSensitivity;
 import weka.WekaClassifierEvaluator;
 
 import java.io.IOException;
@@ -45,7 +46,7 @@ public class WekaController {
      *
      * @return A list of record of evaluations of classifiers
      */
-    public List<ClassifierEvaluation> walkForwardWithSnoring() {
+    public List<ClassifierEvaluation> walkForwardWithSnoring(CostSensitivity costSensitivity) {
         List<ClassifierEvaluation> evaluations = new ArrayList<>();
         List<DatasetInstance> trainingSet;
         List<DatasetInstance> testingSet;
@@ -78,7 +79,7 @@ public class WekaController {
 
                 relationName = this.projectName + "_testing";
                 ArffGenerator.generateArffFromDataset(datasetHeader, testingSet, relationName, TESTING_OUTPUT);
-                evaluationToBeAdded.addAll(evaluator.evaluateClassifiers(TRAINING_OUTPUT, TESTING_OUTPUT));
+                evaluationToBeAdded.addAll(evaluator.evaluateClassifiers(TRAINING_OUTPUT, TESTING_OUTPUT, costSensitivity));
                 for (ClassifierEvaluation ce : evaluationToBeAdded) {
                     ce.setNumTrainingRelease(trainingSetSize);
                     ce.setPercTraining(percTraining);

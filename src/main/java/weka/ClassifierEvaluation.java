@@ -14,21 +14,16 @@ public class ClassifierEvaluation {
     private int falsePositive;
     private int trueNegative;
     private int falseNegative;
-    private final double precision;
-    private final double recall;
-    private final double auc;
-    private final double kappa;
+    private double precision;
+    private double recall;
+    private double auc;
+    private double kappa;
 
-    public ClassifierEvaluation(String classifier, boolean balancing, boolean featureSelection, boolean sensitivity,
-                                double precision, double recall, double auc, double kappa) {
+    public ClassifierEvaluation(String classifier, boolean balancing, boolean featureSelection, boolean sensitivity) {
         this.classifier = classifier;
         this.balancing = balancing;
         this.featureSelection = featureSelection;
         this.sensitivity = sensitivity;
-        this.precision = precision;
-        this.recall = recall;
-        this.auc = auc;
-        this.kappa = kappa;
     }
 
     public int getNumTrainingRelease() {
@@ -127,18 +122,33 @@ public class ClassifierEvaluation {
         return precision;
     }
 
+    public void setPrecision(double precision) {
+        this.precision = precision;
+    }
+
     public double getRecall() {
         return recall;
+    }
+
+    public void setRecall(double recall){
+        this.recall = recall;
     }
 
     public double getAuc() {
         return auc;
     }
 
+    public void setAuc(double auc){
+        this.auc = auc;
+    }
+
     public double getKappa() {
         return kappa;
     }
 
+    public void setKappa(double kappa){
+        this.kappa = kappa;
+    }
 
     public String[] toStringArray(String datasetName){
         return new String[]{
