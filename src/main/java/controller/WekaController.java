@@ -91,7 +91,6 @@ public class WekaController {
                 LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error generating arff files");
             } catch (Exception e) {
                 LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error evaluating classifiers");
-                e.printStackTrace();
             }
         }
 
