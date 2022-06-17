@@ -231,18 +231,26 @@ public class Main {
 
         // throw away the first 2 columns (release and filename)
         String[] wekaHeader = Arrays.copyOfRange(csvHeader, 2, csvHeader.length);
-        //TODO
-        //WekaController wekaController = new WekaController(projectName, dataset, wekaHeader);
+
         WekaController wekaController = new WekaController(projectName, datasetsWithSnoring, wekaHeader);
         logger.info("Walk Forward technique to evaluate classifiers is running ...");
 
-//        List<ClassifierEvaluation> evaluations = wekaController.walkForward();
         List<ClassifierEvaluation> evaluations = wekaController.walkForwardWithSnoring();
         List<String[]> evaluationsToCsv = new ArrayList<>();
         String[] header = new String[]{
                 "Dataset",
                 "#TrainingRelease",
+                "%Training",
+                "%DefectiveInTraining",
+                "%DefectiveInTesting",
                 "Classifier",
+                "Balancing",
+                "FeatureSelection",
+                "Sensitivity",
+                "TP",
+                "FP",
+                "TN",
+                "FN",
                 "Precision",
                 "Recall",
                 "AUC",

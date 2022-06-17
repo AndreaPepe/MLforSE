@@ -8,10 +8,7 @@ import weka.classifiers.Evaluation;
 import weka.classifiers.bayes.NaiveBayes;
 import weka.classifiers.lazy.IBk;
 import weka.classifiers.meta.FilteredClassifier;
-import weka.classifiers.rules.ZeroR;
-import weka.classifiers.trees.J48;
 import weka.classifiers.trees.RandomForest;
-import weka.core.Attribute;
 import weka.core.Instances;
 import weka.core.converters.ConverterUtils;
 import weka.filters.Filter;
@@ -41,8 +38,8 @@ public class WekaClassifierEvaluator {
             testing = sourceTesting.getDataSet();
         }
 
-        /*
-         * Perform feature selection
+        /**
+         * Perform FEATURE SELECTION
          * using Backward Search greedy algorithm, because the number of
          * features is relatively small and so it does not cost so much in terms of
          * execution time. Moreover, the main goal is to eliminate redundant features.
@@ -63,13 +60,13 @@ public class WekaClassifierEvaluator {
             oldAttributes.add(training.attribute(i).name());
         }
         List<String> filteredAttributes = new ArrayList<>();
-        for (int i=0; i < trainingFiltered.numAttributes(); i++){
+        for (int i = 0; i < trainingFiltered.numAttributes(); i++) {
             filteredAttributes.add(trainingFiltered.attribute(i).name());
         }
 
         LoggerSingleton.getInstance().getLogger().info("Original features: " + training.numAttributes() + " Filtered features: " + trainingFiltered.numAttributes());
-        for (String feature: oldAttributes){
-            if (!filteredAttributes.contains(feature)){
+        for (String feature : oldAttributes) {
+            if (!filteredAttributes.contains(feature)) {
                 LoggerSingleton.getInstance().getLogger().info("Removed feature: " + feature);
             }
         }
@@ -87,7 +84,9 @@ public class WekaClassifierEvaluator {
         AbstractClassifier classifier;
 
 
-
+        /**
+         * BALANCING UNDER-SAMPLING
+         */
         List<ClassifierEvaluation> classifierEvaluations = new ArrayList<>();
         for (ClassifierType classifierName : this.classifiers) {
             classifier = handleClassifier(classifierName);
@@ -110,12 +109,20 @@ public class WekaClassifierEvaluator {
 
             eval.evaluateModel(filteredClassifier, testingFiltered);
 
-            classifierEvaluations.add(new ClassifierEvaluation(
+            ClassifierEvaluation record = new ClassifierEvaluation(
                     classifierName.toString(),
+                    true,
+                    true,
+                    false,
                     eval.precision(1),
                     eval.recall(1),
                     eval.areaUnderROC(1),
-                    eval.kappa()));
+                    eval.kappa());
+            record.setTruePositive((int) eval.numTruePositives(1));
+            record.setFalsePositive((int) eval.numFalsePositives(1));
+            record.setTrueNegative((int) eval.numTrueNegatives(1));
+            record.setFalseNegative((int) eval.numFalseNegatives(1));
+            classifierEvaluations.add(record);
 
         }
         return classifierEvaluations;
@@ -127,17 +134,11 @@ public class WekaClassifierEvaluator {
             case NAIVE_BAYES:
                 return new NaiveBayes();
 
-            case J48:
-                return new J48();
-
             case RANDOM_FOREST:
                 return new RandomForest();
 
             case IBK:
                 return new IBk();
-
-            case ZERO_R:
-                return new ZeroR();
 
             default:
                 LoggerSingleton.getInstance().getLogger().info("Invalid classifier chosen");

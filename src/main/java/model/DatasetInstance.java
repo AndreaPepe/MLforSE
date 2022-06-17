@@ -337,15 +337,15 @@ public class DatasetInstance {
                 Integer.toString(this.locTouched),
                 Integer.toString(this.locAdded),
                 Integer.toString(this.maxLocAdded),
-                String.format("%f", this.avgLocAdded),
+                String.format("%.4f", this.avgLocAdded),
                 Integer.toString(this.numberOfRevisions),
                 Integer.toString(this.getNumberOfAuthors()),
                 Integer.toString(this.churn),
                 Integer.toString(this.maxChurn),
-                String.format("%f", this.avgChurn),
+                String.format("%.4f", this.avgChurn),
                 Integer.toString(this.getNumberOfFixedBugs()),
                 Integer.toString(this.age),
-                String.format("%f", this.getWeightedAge()),
+                String.format("%.4f", this.getWeightedAge()),
                 this.isBuggyYesOrNot()
         };
     }

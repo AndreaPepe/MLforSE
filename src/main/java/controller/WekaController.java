@@ -25,17 +25,6 @@ public class WekaController {
 
     private final Map<String, List<DatasetInstance>> datasetsWithSnoring;
 
-    public WekaController(String projectName, List<DatasetInstance> dataset, String[] datasetHeader) {
-        this.projectName = projectName;
-        this.datasetPerRelease = divideDatasetPerRelease(dataset);
-        this.datasetHeader = datasetHeader;
-        this.numReleases = datasetPerRelease.keySet().size();
-        this.releases = new ArrayList<>(datasetPerRelease.keySet());
-
-
-        this.datasetsWithSnoring = null;
-    }
-
     public WekaController(String projectName, Map<String, List<DatasetInstance>> datasetsWithSnoring, String[] datasetHeader) {
         this.projectName = projectName;
         this.datasetsWithSnoring = datasetsWithSnoring;
@@ -47,21 +36,40 @@ public class WekaController {
         this.datasetPerRelease = divideDatasetPerRelease(datasetsWithSnoring.get(releases.get(releases.size() - 1)));
     }
 
+    /**
+     * This method applies the Walk Forward validation technique
+     * in order to estimate quality metrics of the built model.
+     * It takes in account the presence of the Snoring effect, using
+     * training sets that are not affected by information known after
+     * the date of the release they represent.
+     *
+     * @return A list of record of evaluations of classifiers
+     */
     public List<ClassifierEvaluation> walkForwardWithSnoring() {
         List<ClassifierEvaluation> evaluations = new ArrayList<>();
         List<DatasetInstance> trainingSet;
         List<DatasetInstance> testingSet;
         int trainingSetSize;
+        float percTraining;
+        float percDefectiveTraining;
+        float percDefectiveTesting;
         String relationName;
         List<ClassifierEvaluation> evaluationToBeAdded;
 
         WekaClassifierEvaluator evaluator = new WekaClassifierEvaluator();
 
+        // The index i is always the index of the TESTING set in this loop
         for (int i = 1; i < numReleases - 1; i++) {
             trainingSetSize = i;
             String currentReleaseForTraining = releases.get(i - 1);
             trainingSet = this.datasetsWithSnoring.get(currentReleaseForTraining);
             testingSet = this.datasetPerRelease.get(releases.get(i));
+
+            Float[] percentages = computePercentagesOnDatasets(trainingSet, testingSet);
+            percTraining = percentages[0];
+            percDefectiveTraining = percentages[1];
+            percDefectiveTesting = percentages[2];
+
             evaluationToBeAdded = new ArrayList<>();
             // generate arff files for training and testing
             try {
@@ -72,7 +80,10 @@ public class WekaController {
                 ArffGenerator.generateArffFromDataset(datasetHeader, testingSet, relationName, TESTING_OUTPUT);
                 evaluationToBeAdded.addAll(evaluator.evaluateClassifiers(TRAINING_OUTPUT, TESTING_OUTPUT));
                 for (ClassifierEvaluation ce : evaluationToBeAdded) {
-                    ce.setTrainingSetSize(trainingSetSize);
+                    ce.setNumTrainingRelease(trainingSetSize);
+                    ce.setPercTraining(percTraining);
+                    ce.setPercDefectiveTraining(percDefectiveTraining);
+                    ce.setPercDefectiveTesting(percDefectiveTesting);
                 }
                 evaluations.addAll(evaluationToBeAdded);
             } catch (IOException e) {
@@ -86,56 +97,6 @@ public class WekaController {
         return evaluations;
     }
 
-    /**
-     * This method implements the Walk Forward technique
-     * to evaluate different classifiers on a given dataset.
-     */
-    public List<ClassifierEvaluation> walkForward() {
-        List<ClassifierEvaluation> evaluations = new ArrayList<>();
-        List<DatasetInstance> trainingSet;
-        List<DatasetInstance> testingSet;
-        int trainingSetSize;
-        String relationName;
-        List<ClassifierEvaluation> evaluationToBeAdded;
-
-        WekaClassifierEvaluator evaluator = new WekaClassifierEvaluator();
-
-        for (int i = 1; i < numReleases - 1; i++) {
-            trainingSetSize = i;
-            trainingSet = buildTrainingSet(i - 1);
-            testingSet = this.datasetPerRelease.get(releases.get(i));
-            evaluationToBeAdded = new ArrayList<>();
-            // generate arff files for training and testing
-            try {
-                relationName = this.projectName + "_training";
-                ArffGenerator.generateArffFromDataset(datasetHeader, trainingSet, relationName, TRAINING_OUTPUT);
-
-                relationName = this.projectName + "_testing";
-                ArffGenerator.generateArffFromDataset(datasetHeader, testingSet, relationName, TESTING_OUTPUT);
-                evaluationToBeAdded.addAll(evaluator.evaluateClassifiers(TRAINING_OUTPUT, TESTING_OUTPUT));
-                for (ClassifierEvaluation ce : evaluationToBeAdded) {
-                    ce.setTrainingSetSize(trainingSetSize);
-                }
-                evaluations.addAll(evaluationToBeAdded);
-            } catch (IOException e) {
-                LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error generating arff files");
-            } catch (Exception e) {
-                LoggerSingleton.getInstance().getLogger().log(Level.SEVERE, "Error evaluating classifiers");
-            }
-        }
-
-        return evaluations;
-    }
-
-    private List<DatasetInstance> buildTrainingSet(int indexOfLatestRelease) {
-        String release;
-        List<DatasetInstance> ret = new ArrayList<>();
-        for (int i = 0; i <= indexOfLatestRelease; i++) {
-            release = this.releases.get(i);
-            ret.addAll(this.datasetPerRelease.get(release));
-        }
-        return ret;
-    }
 
 
     private Map<String, List<DatasetInstance>> divideDatasetPerRelease(List<DatasetInstance> dataset) {
@@ -148,5 +109,28 @@ public class WekaController {
             result.get(instance.getVersion()).add(instance);
         }
         return result;
+    }
+
+    private Float[] computePercentagesOnDatasets(List<DatasetInstance> trainingSet, List<DatasetInstance> testingSet){
+        int numRecordTraining = trainingSet.size();
+        int numRecordTesting = testingSet.size();
+        float percTraining = (float) numRecordTraining / (numRecordTraining + numRecordTesting);
+        int defectiveTraining = 0;
+        int defectiveTesting = 0;
+
+        for (DatasetInstance i : trainingSet){
+            if (i.isBuggy())
+                defectiveTraining++;
+        }
+
+        for (DatasetInstance i : testingSet){
+            if (i.isBuggy())
+                defectiveTesting++;
+        }
+
+        float percDefectiveTraining = (float) defectiveTraining / numRecordTraining;
+        float percDefectiveTesting = (float) defectiveTesting / numRecordTesting;
+
+        return new Float[] {percTraining, percDefectiveTraining, percDefectiveTesting};
     }
 }
